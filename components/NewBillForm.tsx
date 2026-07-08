@@ -292,8 +292,10 @@ export function NewBillForm() {
               className={inputClass}
             />
             <input
+              type="tel"
+              inputMode="numeric"
               value={newCustomerPhone}
-              onChange={(e) => setNewCustomerPhone(e.target.value)}
+              onChange={(e) => setNewCustomerPhone(e.target.value.replace(/[^\d+]/g, ""))}
               placeholder="Phone"
               className={inputClass}
             />
