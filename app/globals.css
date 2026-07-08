@@ -1,0 +1,33 @@
+@import "tailwindcss";
+
+:root {
+  --color-sage: #4f7c6c;
+  --color-sage-dark: #33473f;
+  --color-terracotta: #d98b5f;
+  --color-blush: #f0c4cc;
+  --color-gold: #c9a15a;
+  --color-cream: #f7f1e6;
+
+  --background: var(--color-cream);
+  --foreground: var(--color-sage-dark);
+}
+
+@theme inline {
+  --color-sage: var(--color-sage);
+  --color-sage-dark: var(--color-sage-dark);
+  --color-terracotta: var(--color-terracotta);
+  --color-blush: var(--color-blush);
+  --color-gold: var(--color-gold);
+  --color-cream: var(--color-cream);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-serif: var(--font-display);
+  --font-sans: var(--font-body);
+}
+
+/* Brand identity is fixed regardless of system dark-mode preference. */
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-body), Arial, Helvetica, sans-serif;
+}
