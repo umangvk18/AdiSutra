@@ -80,6 +80,35 @@ export async function getBillDetail(billNumber: string): Promise<BillDetail | nu
   return { bill, customer, items: enrichedItems };
 }
 
+/**
+ * Section 7.4: logs an additional payment against an existing Partial/Credit
+ * bill. Adds to amount_paid, recalculates amount_due, and re-derives
+ * payment_status -- updates the same bill row in place rather than creating
+ * a new bill record.
+ */
+export async function logPayment(billNumber: string, amount: number): Promise<Bill> {
+  if (amount <= 0) {
+    throw new Error("Amount must be greater than 0");
+  }
+  const bill = await getBillByNumber(billNumber);
+  if (!bill) {
+    throw new Error(`Bill ${billNumber} not found`);
+  }
+
+  const amountPaid = Math.min(bill.amount_paid + amount, bill.total_amount);
+  const amountDue = Math.max(0, bill.total_amount - amountPaid);
+  const paymentStatus: PaymentStatus =
+    amountDue <= 0 ? "Paid" : amountPaid > 0 ? "Partial" : "Credit";
+
+  await updateRowByKey(SHEET.Bills, "bill_number", billNumber, {
+    amount_paid: amountPaid,
+    amount_due: amountDue,
+    payment_status: paymentStatus,
+  });
+
+  return { ...bill, amount_paid: amountPaid, amount_due: amountDue, payment_status: paymentStatus };
+}
+
 /** Section 9: customer total spend / current due, always computed live from Bills. */
 export async function getCustomerBillSummary(customerId: string): Promise<{
   customer: Customer | null;

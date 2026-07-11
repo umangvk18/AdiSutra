@@ -4,16 +4,26 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import type { BillDetail } from "@/lib/types";
 import { photoProxySrc } from "@/lib/photoUrl";
+import { BillImageActions } from "@/components/BillImageActions";
+import type { BillImageItem } from "@/components/BillImageTemplate";
 
 export default function BillDetailPage() {
   const { billNumber } = useParams<{ billNumber: string }>();
   const router = useRouter();
   const [detail, setDetail] = useState<BillDetail | null | undefined>(undefined);
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [loggingPayment, setLoggingPayment] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
 
-  useEffect(() => {
+  function loadDetail() {
     fetch(`/api/bills/${billNumber}`)
       .then(async (res) => (res.ok ? await res.json() : null))
       .then(setDetail);
+  }
+
+  useEffect(() => {
+    loadDetail();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [billNumber]);
 
   if (detail === undefined) {
@@ -33,6 +43,28 @@ export default function BillDetailPage() {
 
   const { bill, customer, items } = detail;
 
+  async function handleLogPayment(amount: number) {
+    setLoggingPayment(true);
+    setPaymentError(null);
+    try {
+      const res = await fetch(`/api/bills/${billNumber}/payment`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Failed to log payment");
+      }
+      setPaymentAmount("");
+      loadDetail();
+    } catch (err) {
+      setPaymentError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setLoggingPayment(false);
+    }
+  }
+
   const row = (label: string, value: string, opts?: { color?: string }) => (
     <div className="flex justify-between border-b border-gold/15 py-2 text-sm">
       <span className="text-sage-dark/60">{label}</span>
@@ -41,6 +73,12 @@ export default function BillDetailPage() {
       </span>
     </div>
   );
+
+  const billImageItems: BillImageItem[] = items.map((item) => ({
+    saree_code: item.saree_code,
+    description: `${item.material} - ${item.design_type}`,
+    price: item.price_at_sale,
+  }));
 
   return (
     <div className="flex flex-1 flex-col pb-24">
@@ -66,6 +104,38 @@ export default function BillDetailPage() {
           {bill.amount_due > 0 && row("Due", `₹${bill.amount_due}`, { color: "#D98B5F" })}
           {row("Payment Status", bill.payment_status)}
         </div>
+
+        {bill.amount_due > 0 && (
+          <div className="mt-4 rounded-2xl border border-gold/20 bg-white p-4">
+            <h2 className="mb-2 text-sm font-medium text-sage-dark/80">Log Payment</h2>
+            <div className="flex gap-2">
+              <input
+                type="number"
+                inputMode="decimal"
+                value={paymentAmount}
+                onChange={(e) => setPaymentAmount(e.target.value)}
+                placeholder="Amount received"
+                className="flex-1 rounded-xl border-2 border-gold/30 bg-white px-4 py-3 text-base text-sage-dark outline-none focus:border-sage"
+              />
+              <button
+                type="button"
+                onClick={() => setPaymentAmount(String(bill.amount_due))}
+                className="rounded-xl border-2 border-sage px-3 py-3 text-sm text-sage"
+              >
+                Full (₹{bill.amount_due})
+              </button>
+            </div>
+            {paymentError && <p className="mt-2 text-center text-terracotta">{paymentError}</p>}
+            <button
+              type="button"
+              disabled={loggingPayment || !(Number(paymentAmount) > 0)}
+              onClick={() => handleLogPayment(Number(paymentAmount))}
+              className="mt-3 w-full rounded-xl bg-sage py-3 font-medium text-cream disabled:opacity-50"
+            >
+              {loggingPayment ? "Saving..." : "Log Payment"}
+            </button>
+          </div>
+        )}
 
         <h2 className="mb-2 mt-4 text-sm font-medium text-sage-dark/80">Items</h2>
         <div className="flex flex-col gap-2">
@@ -100,8 +170,15 @@ export default function BillDetailPage() {
           ))}
         </div>
 
+        {customer && (
+          <div className="mt-6">
+            <h2 className="mb-2 text-sm font-medium text-sage-dark/80">Bill Image</h2>
+            <BillImageActions bill={bill} customer={customer} items={billImageItems} />
+          </div>
+        )}
+
         <p className="mt-4 text-center text-xs text-sage-dark/50">
-          Log Payment and Process Return are coming in Phase 2.
+          Process Return is coming in Phase 2.
         </p>
       </div>
     </div>

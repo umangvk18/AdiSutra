@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { toPng } from "html-to-image";
 import type { Saree, Customer } from "@/lib/types";
 import { photoProxySrc } from "@/lib/photoUrl";
 import { DiscountInput } from "./DiscountInput";
-import { BillImageTemplate, type BillImageItem } from "./BillImageTemplate";
+import { BillImageActions } from "./BillImageActions";
+import type { BillImageItem } from "./BillImageTemplate";
 
 type PaymentMode = "full" | "partial" | "credit";
 
@@ -18,10 +18,10 @@ export function NewBillForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const presetCustomerId = searchParams.get("customer");
-  const captureRef = useRef<HTMLDivElement>(null);
 
   const [sarees, setSarees] = useState<Saree[] | null>(null);
   const [selectedCodes, setSelectedCodes] = useState<string[]>([]);
+  const [sareeQuery, setSareeQuery] = useState("");
 
   const [customers, setCustomers] = useState<Customer[] | null>(null);
   const [customerQuery, setCustomerQuery] = useState("");
@@ -73,6 +73,17 @@ export function NewBillForm() {
   const amountPaid =
     paymentMode === "full" ? totalAmount : paymentMode === "credit" ? 0 : Number(partialAmount) || 0;
   const amountDue = Math.max(0, totalAmount - amountPaid);
+
+  const filteredSarees = (sarees ?? []).filter((s) => {
+    const q = sareeQuery.trim().toLowerCase();
+    if (!q) return true;
+    const codeDigits = s.saree_code.replace(/\D/g, "");
+    const queryDigits = q.replace(/\D/g, "");
+    return (
+      s.saree_code.toLowerCase().includes(q) ||
+      (queryDigits.length > 0 && codeDigits.includes(queryDigits))
+    );
+  });
 
   const filteredCustomers = (customers ?? []).filter((c) => {
     const q = customerQuery.trim().toLowerCase();
@@ -151,54 +162,30 @@ export function NewBillForm() {
     }
   }
 
-  async function handleShareWhatsApp() {
-    if (!successBill || !captureRef.current) return;
-    const dataUrl = await toPng(captureRef.current, { pixelRatio: 2 });
-
-    const link = document.createElement("a");
-    link.download = `${successBill.bill_number}.png`;
-    link.href = dataUrl;
-    link.click();
-
-    const phoneDigits = successBill.customer.phone.replace(/\D/g, "");
-    const message = `Hi ${successBill.customer.name}, thank you for your purchase! Bill attached below 🌸`;
-    window.open(`https://wa.me/${phoneDigits}?text=${encodeURIComponent(message)}`, "_blank");
-  }
-
   if (successBill) {
     return (
       <div className="flex flex-1 flex-col items-center gap-6 p-6 text-center">
         <div className="text-5xl">🌸</div>
         <h2 className="font-serif text-2xl text-sage">Bill {successBill.bill_number} created</h2>
 
-        <div className="fixed left-[-9999px] top-0">
-          <div ref={captureRef}>
-            <BillImageTemplate
-              bill={{
-                bill_number: successBill.bill_number,
-                customer_id: successBill.customer.customer_id,
-                date: successBill.date,
-                subtotal: successBill.subtotal,
-                discount: successBill.discount,
-                total_amount: successBill.total_amount,
-                amount_paid: successBill.amount_paid,
-                amount_due: successBill.amount_due,
-                payment_status: successBill.payment_status as "Paid" | "Partial" | "Credit",
-                bill_status: "Active",
-              }}
-              customer={successBill.customer}
-              items={successBill.items}
-            />
-          </div>
-        </div>
+        <BillImageActions
+          bill={{
+            bill_number: successBill.bill_number,
+            customer_id: successBill.customer.customer_id,
+            date: successBill.date,
+            subtotal: successBill.subtotal,
+            discount: successBill.discount,
+            total_amount: successBill.total_amount,
+            amount_paid: successBill.amount_paid,
+            amount_due: successBill.amount_due,
+            payment_status: successBill.payment_status as "Paid" | "Partial" | "Credit",
+            bill_status: "Active",
+          }}
+          customer={successBill.customer}
+          items={successBill.items}
+        />
 
         <div className="flex flex-col gap-3">
-          <button
-            onClick={handleShareWhatsApp}
-            className="rounded-xl bg-sage px-6 py-4 text-lg font-medium text-cream"
-          >
-            Save Bill Image &amp; Send on WhatsApp
-          </button>
           <button
             onClick={() => router.push(`/bills/${successBill.bill_number}`)}
             className="rounded-xl border-2 border-sage px-6 py-3 text-sage"
@@ -222,13 +209,23 @@ export function NewBillForm() {
         <h2 className="mb-2 text-sm font-medium text-sage-dark/80">
           Select sarees ({selectedCodes.length} selected)
         </h2>
+        {sarees !== null && sarees.length > 0 && (
+          <input
+            value={sareeQuery}
+            onChange={(e) => setSareeQuery(e.target.value)}
+            placeholder="Search by code (e.g. 0303 or AS-0303)"
+            className="mb-2 w-full rounded-xl border-2 border-gold/30 bg-white px-4 py-3 text-base text-sage-dark outline-none focus:border-sage"
+          />
+        )}
         {sarees === null ? (
           <p className="p-4 text-center text-sage-dark/60">Loading stock...</p>
         ) : sarees.length === 0 ? (
           <p className="p-4 text-center text-sage-dark/60">No sarees in stock right now.</p>
+        ) : filteredSarees.length === 0 ? (
+          <p className="p-4 text-center text-sage-dark/60">No sarees match &quot;{sareeQuery}&quot;.</p>
         ) : (
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-            {sarees.map((s) => {
+            {filteredSarees.map((s) => {
               const selected = selectedCodes.includes(s.saree_code);
               return (
                 <button
