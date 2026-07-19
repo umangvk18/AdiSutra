@@ -1,5 +1,5 @@
 import "server-only";
-import { readSheet, appendRowWithGeneratedId } from "./sheets";
+import { readSheet, appendRowWithGeneratedId, updateRowByKey } from "./sheets";
 import { SHEET } from "./config";
 import type { Saree, SareeStatus } from "../types";
 
@@ -87,4 +87,31 @@ export async function createSaree(input: NewSareeInput): Promise<Saree> {
     })
   );
   return parseSaree(row as unknown as Record<string, string>);
+}
+
+export type UpdateSareeInput = {
+  photo_url: string;
+  region: string;
+  vendor: string;
+  material: string;
+  design_type: string;
+  color: string;
+  cost_price: number;
+  selling_price: number;
+  date_received: string;
+};
+
+/**
+ * Edits a saree's business fields (region/vendor/material/design/color/
+ * prices/date/photo). Deliberately excludes status/date_sold/bill_number --
+ * those stay fully automatic per Section 3.1 and are never hand-edited.
+ * Already-recorded bills keep their own frozen price_at_sale snapshot, so
+ * editing selling_price here has no effect on past sales.
+ */
+export async function updateSaree(code: string, input: UpdateSareeInput): Promise<Saree> {
+  const ok = await updateRowByKey(SHEET.Inventory, "saree_code", code, input);
+  if (!ok) throw new Error(`Saree ${code} not found`);
+  const updated = await getSareeByCode(code);
+  if (!updated) throw new Error(`Saree ${code} not found after update`);
+  return updated;
 }

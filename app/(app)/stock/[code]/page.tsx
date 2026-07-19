@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import type { Saree } from "@/lib/types";
 import { photoProxySrc } from "@/lib/photoUrl";
 
@@ -74,6 +75,13 @@ export default function SareeDetailPage() {
           {saree.status === "Sold" && row("Date Sold", saree.date_sold)}
           {saree.status === "Sold" && row("Bill Number", saree.bill_number)}
         </div>
+
+        <Link
+          href={`/stock/${saree.saree_code}/edit`}
+          className="mt-4 block rounded-2xl bg-sage py-3 text-center font-medium text-cream"
+        >
+          Edit Saree
+        </Link>
       </div>
     </div>
   );

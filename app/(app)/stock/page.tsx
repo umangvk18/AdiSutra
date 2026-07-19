@@ -5,6 +5,13 @@ import Link from "next/link";
 import type { Saree, AttributesByType } from "@/lib/types";
 import { photoProxySrc } from "@/lib/photoUrl";
 
+type SortOption = "newest" | "oldest" | "id_asc" | "id_desc";
+
+function sareeIdNumber(code: string): number {
+  const digits = code.replace(/\D/g, "");
+  return digits ? parseInt(digits, 10) : 0;
+}
+
 export default function StockPage() {
   const [items, setItems] = useState<Saree[] | null>(null);
   const [attributes, setAttributes] = useState<AttributesByType>({});
@@ -13,6 +20,8 @@ export default function StockPage() {
   const [material, setMaterial] = useState("");
   const [designType, setDesignType] = useState("");
   const [vendor, setVendor] = useState("");
+  const [query, setQuery] = useState("");
+  const [sortBy, setSortBy] = useState<SortOption>("newest");
 
   const load = useCallback(async () => {
     const params = new URLSearchParams();
@@ -36,6 +45,34 @@ export default function StockPage() {
     load();
   }, [load]);
 
+  const searched = (items ?? []).filter((item) => {
+    const q = query.trim().toLowerCase();
+    if (!q) return true;
+    const codeDigits = item.saree_code.replace(/\D/g, "");
+    const queryDigits = q.replace(/\D/g, "");
+    return (
+      item.saree_code.toLowerCase().includes(q) ||
+      (queryDigits.length > 0 && codeDigits.includes(queryDigits)) ||
+      item.material.toLowerCase().includes(q) ||
+      item.design_type.toLowerCase().includes(q) ||
+      item.color.toLowerCase().includes(q)
+    );
+  });
+
+  const displayedItems = [...searched].sort((a, b) => {
+    switch (sortBy) {
+      case "id_asc":
+        return sareeIdNumber(a.saree_code) - sareeIdNumber(b.saree_code);
+      case "id_desc":
+        return sareeIdNumber(b.saree_code) - sareeIdNumber(a.saree_code);
+      case "oldest":
+        return a.date_received < b.date_received ? -1 : 1;
+      case "newest":
+      default:
+        return a.date_received < b.date_received ? 1 : -1;
+    }
+  });
+
   const selectClass =
     "rounded-lg border border-gold/30 bg-white px-3 py-2 text-sm text-sage-dark";
 
@@ -44,6 +81,15 @@ export default function StockPage() {
       <header className="p-4 pb-2">
         <h1 className="font-serif text-2xl text-sage">Stock</h1>
       </header>
+
+      <div className="px-4 pb-2">
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search by code, material, design, or color"
+          className="w-full rounded-lg border border-gold/30 bg-white px-3 py-2 text-sm text-sage-dark"
+        />
+      </div>
 
       <div className="flex flex-wrap gap-2 px-4 pb-3">
         <select value={status} onChange={(e) => setStatus(e.target.value)} className={selectClass}>
@@ -75,16 +121,26 @@ export default function StockPage() {
             <option key={v} value={v}>{v}</option>
           ))}
         </select>
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value as SortOption)}
+          className={selectClass}
+        >
+          <option value="newest">Newest first</option>
+          <option value="oldest">Oldest first</option>
+          <option value="id_asc">ID: Low to High</option>
+          <option value="id_desc">ID: High to Low</option>
+        </select>
       </div>
 
       <div className="flex-1 px-4">
         {items === null ? (
           <p className="p-8 text-center text-sage-dark/60">Loading...</p>
-        ) : items.length === 0 ? (
-          <p className="p-8 text-center text-sage-dark/60">No sarees match these filters.</p>
+        ) : displayedItems.length === 0 ? (
+          <p className="p-8 text-center text-sage-dark/60">No sarees match.</p>
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {items.map((item) => (
+            {displayedItems.map((item) => (
               <Link
                 key={item.saree_code}
                 href={`/stock/${item.saree_code}`}
