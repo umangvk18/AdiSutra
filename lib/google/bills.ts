@@ -7,6 +7,7 @@ import type {
   Bill,
   BillItem,
   PaymentStatus,
+  PaymentMethod,
   BillDetail,
   Customer,
   HomeSummary,
@@ -27,6 +28,7 @@ function parseBill(row: Record<string, string>): Bill {
     amount_due: Number(row.amount_due) || 0,
     payment_status: (row.payment_status as PaymentStatus) || "Credit",
     bill_status: (row.bill_status as Bill["bill_status"]) || "Active",
+    payment_method: (row.payment_method as PaymentMethod) || "Cash",
   };
 }
 
@@ -168,6 +170,7 @@ export type CreateBillInput = {
   discount: number; // already resolved to a flat rupee amount by the caller
   amount_paid: number;
   date: string;
+  payment_method: PaymentMethod;
 };
 
 /**
@@ -214,6 +217,7 @@ export async function createBill(
     amount_due: amountDue,
     payment_status: paymentStatus,
     bill_status: "Active",
+    payment_method: input.payment_method,
   };
   await appendRow(SHEET.Bills, bill);
 

@@ -9,6 +9,7 @@ import { BillImageActions } from "./BillImageActions";
 import type { BillImageItem } from "./BillImageTemplate";
 
 type PaymentMode = "full" | "partial" | "credit";
+type PaymentMethod = "Cash" | "UPI";
 
 function today() {
   return new Date().toISOString().slice(0, 10);
@@ -33,6 +34,7 @@ export function NewBillForm() {
   const [discountAmount, setDiscountAmount] = useState(0);
   const [paymentMode, setPaymentMode] = useState<PaymentMode>("full");
   const [partialAmount, setPartialAmount] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("Cash");
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,6 +48,7 @@ export function NewBillForm() {
     discount: number;
     subtotal: number;
     payment_status: string;
+    payment_method: PaymentMethod;
     date: string;
   } | null>(null);
 
@@ -74,6 +77,8 @@ export function NewBillForm() {
     paymentMode === "full" ? totalAmount : paymentMode === "credit" ? 0 : Number(partialAmount) || 0;
   const amountDue = Math.max(0, totalAmount - amountPaid);
 
+  const sareeSearchActive = sareeQuery.trim().length > 0;
+
   const filteredSarees = (sarees ?? []).filter((s) => {
     const q = sareeQuery.trim().toLowerCase();
     if (!q) return true;
@@ -84,6 +89,16 @@ export function NewBillForm() {
       (queryDigits.length > 0 && codeDigits.includes(queryDigits))
     );
   });
+
+  // When not searching, show already-selected sarees first so it's easy to
+  // review/deselect them without hunting through the whole catalogue.
+  const displaySarees = sareeSearchActive
+    ? filteredSarees
+    : [...filteredSarees].sort((a, b) => {
+        const aSel = selectedCodes.includes(a.saree_code);
+        const bSel = selectedCodes.includes(b.saree_code);
+        return aSel === bSel ? 0 : aSel ? -1 : 1;
+      });
 
   const filteredCustomers = (customers ?? []).filter((c) => {
     const q = customerQuery.trim().toLowerCase();
@@ -129,6 +144,7 @@ export function NewBillForm() {
           discount: discountAmount,
           amount_paid: amountPaid,
           date,
+          payment_method: paymentMethod,
         }),
       });
       if (!res.ok) {
@@ -153,6 +169,7 @@ export function NewBillForm() {
         discount: data.bill.discount,
         subtotal: data.bill.subtotal,
         payment_status: data.bill.payment_status,
+        payment_method: data.bill.payment_method,
         date: data.bill.date,
       });
     } catch (err) {
@@ -180,6 +197,7 @@ export function NewBillForm() {
             amount_due: successBill.amount_due,
             payment_status: successBill.payment_status as "Paid" | "Partial" | "Credit",
             bill_status: "Active",
+            payment_method: successBill.payment_method,
           }}
           customer={successBill.customer}
           items={successBill.items}
@@ -221,11 +239,11 @@ export function NewBillForm() {
           <p className="p-4 text-center text-sage-dark/60">Loading stock...</p>
         ) : sarees.length === 0 ? (
           <p className="p-4 text-center text-sage-dark/60">No sarees in stock right now.</p>
-        ) : filteredSarees.length === 0 ? (
+        ) : displaySarees.length === 0 ? (
           <p className="p-4 text-center text-sage-dark/60">No sarees match &quot;{sareeQuery}&quot;.</p>
         ) : (
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-            {filteredSarees.map((s) => {
+          <div className="grid max-h-[340px] grid-cols-3 gap-2 overflow-y-auto sm:grid-cols-4">
+            {displaySarees.map((s) => {
               const selected = selectedCodes.includes(s.saree_code);
               return (
                 <button
@@ -335,7 +353,14 @@ export function NewBillForm() {
         )}
       </div>
 
-      <DiscountInput subtotal={subtotal} onChange={setDiscountAmount} />
+      <div>
+        <DiscountInput subtotal={subtotal} onChange={setDiscountAmount} />
+        {discountAmount > 0 && (
+          <p className="mt-1 text-right text-sm text-sage-dark/70">
+            New Total: <span className="font-medium text-sage-dark">₹{totalAmount}</span>
+          </p>
+        )}
+      </div>
 
       <div className="flex flex-col gap-1">
         <label className="text-sm font-medium text-sage-dark/80">Payment</label>
@@ -367,8 +392,35 @@ export function NewBillForm() {
         )}
       </div>
 
+      <div className="flex flex-col gap-1">
+        <label className="text-sm font-medium text-sage-dark/80">Payment Method</label>
+        <div className="flex gap-2">
+          {(["Cash", "UPI"] as const).map((method) => (
+            <button
+              key={method}
+              type="button"
+              onClick={() => setPaymentMethod(method)}
+              className={`flex-1 rounded-xl border-2 py-3 text-sm font-medium ${
+                paymentMethod === method
+                  ? "border-sage bg-sage text-cream"
+                  : "border-gold/30 bg-white text-sage-dark"
+              }`}
+            >
+              {method}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {selectedCodes.length > 0 && (
         <div className="rounded-xl border border-gold/20 bg-white p-4 text-sm">
+          {selectedSarees.map((s) => (
+            <div key={s.saree_code} className="flex justify-between py-1">
+              <span className="text-sage-dark/60">{s.saree_code}</span>
+              <span className="font-medium">₹{s.selling_price}</span>
+            </div>
+          ))}
+          <div className="my-2 border-t border-gold/15" />
           <div className="flex justify-between py-1">
             <span className="text-sage-dark/60">Total</span>
             <span className="font-medium">₹{totalAmount}</span>

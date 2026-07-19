@@ -30,6 +30,7 @@ export type Customer = {
 
 export type PaymentStatus = "Paid" | "Partial" | "Credit";
 export type BillStatus = "Active" | "Returned" | "Partially Returned";
+export type PaymentMethod = "Cash" | "UPI";
 
 export type Bill = {
   bill_number: string;
@@ -42,6 +43,7 @@ export type Bill = {
   amount_due: number;
   payment_status: PaymentStatus;
   bill_status: BillStatus;
+  payment_method: PaymentMethod;
 };
 
 export type BillItem = {

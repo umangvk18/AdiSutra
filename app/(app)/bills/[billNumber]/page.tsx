@@ -103,6 +103,7 @@ export default function BillDetailPage() {
           {row("Paid", `₹${bill.amount_paid}`)}
           {bill.amount_due > 0 && row("Due", `₹${bill.amount_due}`, { color: "#D98B5F" })}
           {row("Payment Status", bill.payment_status)}
+          {row("Payment Method", bill.payment_method)}
         </div>
 
         {bill.amount_due > 0 && (

@@ -21,6 +21,7 @@ export async function POST(request: Request) {
   const discount = Number(body?.discount ?? 0);
   const amountPaid = Number(body?.amount_paid ?? 0);
   const date = typeof body?.date === "string" ? body.date : "";
+  const paymentMethod = body?.payment_method;
 
   if (
     typeof customerId !== "string" ||
@@ -30,7 +31,8 @@ export async function POST(request: Request) {
     !sareeCodesRaw.every((c) => typeof c === "string") ||
     !Number.isFinite(discount) ||
     !Number.isFinite(amountPaid) ||
-    !date
+    !date ||
+    (paymentMethod !== "Cash" && paymentMethod !== "UPI")
   ) {
     return NextResponse.json({ error: "Invalid bill payload" }, { status: 400 });
   }
@@ -42,6 +44,7 @@ export async function POST(request: Request) {
       discount,
       amount_paid: amountPaid,
       date,
+      payment_method: paymentMethod,
     });
     return NextResponse.json(result, { status: 201 });
   } catch (err) {

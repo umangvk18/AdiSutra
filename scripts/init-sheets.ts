@@ -46,6 +46,7 @@ const HEADERS: Record<(typeof SHEET_NAMES)[number], string[]> = {
     "amount_due",
     "payment_status",
     "bill_status",
+    "payment_method",
   ],
   Bill_Items: ["bill_item_id", "bill_number", "saree_code", "price_at_sale", "item_status"],
   Attributes: ["attribute_type", "value"],

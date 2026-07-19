@@ -50,6 +50,7 @@ export const HEADERS: Record<SheetName, readonly string[]> = {
     "amount_due",
     "payment_status",
     "bill_status",
+    "payment_method",
   ],
   [SHEET.BillItems]: [
     "bill_item_id",
