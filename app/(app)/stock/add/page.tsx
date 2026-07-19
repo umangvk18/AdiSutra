@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AttributeSelect } from "@/components/AttributeSelect";
 import type { AttributesByType } from "@/lib/types";
+import { compressImageFile } from "@/lib/clientImage";
 
 function today() {
   return new Date().toISOString().slice(0, 10);
@@ -27,6 +28,7 @@ export default function AddSareePage() {
   const [dateReceived, setDateReceived] = useState(today());
 
   const [submitting, setSubmitting] = useState(false);
+  const [processingPhoto, setProcessingPhoto] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedCode, setSavedCode] = useState<string | null>(null);
 
@@ -46,15 +48,29 @@ export default function AddSareePage() {
     if (data.attributes) setAttributes(data.attributes);
   }
 
-  function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    setPhotoFile(file);
-    setPhotoPreview(URL.createObjectURL(file));
+
+    setProcessingPhoto(true);
+    setError(null);
+    try {
+      const compressed = await compressImageFile(file);
+      setPhotoFile(compressed);
+      setPhotoPreview(URL.createObjectURL(compressed));
+    } catch {
+      // Fall back to the original file -- the server will still try to
+      // process it, this just skips the client-side HEIC/size safety net.
+      setPhotoFile(file);
+      setPhotoPreview(URL.createObjectURL(file));
+    } finally {
+      setProcessingPhoto(false);
+    }
   }
 
   const canSubmit =
     photoFile &&
+    !processingPhoto &&
     region &&
     material &&
     designType &&
@@ -140,7 +156,9 @@ export default function AddSareePage() {
       <form onSubmit={handleSubmit} className="flex flex-col gap-4 px-4">
         <label className="flex flex-col items-center gap-2">
           <div className="flex h-48 w-full items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-gold/50 bg-white">
-            {photoPreview ? (
+            {processingPhoto ? (
+              <span className="text-sage-dark/50">Processing photo...</span>
+            ) : photoPreview ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={photoPreview} alt="Saree preview" className="h-full w-full object-cover" />
             ) : (

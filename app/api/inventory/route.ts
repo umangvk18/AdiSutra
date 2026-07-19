@@ -55,20 +55,25 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Missing or invalid fields" }, { status: 400 });
   }
 
-  const buffer = Buffer.from(await photo.arrayBuffer());
-  const photo_url = await uploadSareePhoto(buffer, `saree-${Date.now()}.jpg`);
+  try {
+    const buffer = Buffer.from(await photo.arrayBuffer());
+    const photo_url = await uploadSareePhoto(buffer, `saree-${Date.now()}.jpg`);
 
-  const saree = await createSaree({
-    photo_url,
-    region,
-    vendor,
-    material,
-    design_type,
-    color,
-    cost_price,
-    selling_price,
-    date_received,
-  });
+    const saree = await createSaree({
+      photo_url,
+      region,
+      vendor,
+      material,
+      design_type,
+      color,
+      cost_price,
+      selling_price,
+      date_received,
+    });
 
-  return NextResponse.json({ saree }, { status: 201 });
+    return NextResponse.json({ saree }, { status: 201 });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to save saree";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }
