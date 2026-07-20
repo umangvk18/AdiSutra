@@ -1,15 +1,18 @@
 import "server-only";
 import { cookies } from "next/headers";
-import { COOKIE_NAME, SESSION_DAYS, encryptSession, verifySessionToken } from "./session-core";
+import { COOKIE_NAME, encryptSession, verifySessionToken } from "./session-core";
 
 export async function createSession(): Promise<void> {
   const token = await encryptSession();
-  const expires = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
   const cookieStore = await cookies();
+  // Deliberately no `expires`/`maxAge` -- this makes it a *session* cookie,
+  // which the browser (or the OS, for an installed PWA) discards when the
+  // app is fully closed, not just backgrounded. The PIN is asked again on
+  // the next real open, while normal navigation within one open session
+  // doesn't re-prompt.
   cookieStore.set(COOKIE_NAME, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    expires,
     sameSite: "lax",
     path: "/",
   });

@@ -250,7 +250,7 @@ export function NewBillForm() {
                   type="button"
                   key={s.saree_code}
                   onClick={() => toggleSaree(s.saree_code)}
-                  className={`relative aspect-square overflow-hidden rounded-xl border-2 ${
+                  className={`relative h-28 overflow-hidden rounded-xl border-2 ${
                     selected ? "border-sage" : "border-transparent"
                   }`}
                 >

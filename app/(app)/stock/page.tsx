@@ -146,7 +146,7 @@ export default function StockPage() {
                 href={`/stock/${item.saree_code}`}
                 className="overflow-hidden rounded-2xl border border-gold/20 bg-white shadow-sm"
               >
-                <div className="relative aspect-square w-full bg-blush/30">
+                <div className="relative h-36 w-full bg-blush/30">
                   {item.photo_url && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img

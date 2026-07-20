@@ -11,23 +11,28 @@ type Props = {
   items: BillImageItem[];
 };
 
+const WEB_SHARE_SUPPORTED =
+  typeof navigator !== "undefined" && typeof navigator.share === "function";
+
 /**
- * Renders the off-screen bill template and offers two actions:
- * - "Send on WhatsApp": tries the Web Share API with the image file attached
- *   directly (so it lands in the picked chat pre-attached, no manual save+
- *   attach step) on browsers that support sharing files. Falls back to the
- *   original download-then-open-wa.me flow where file sharing isn't
- *   supported (e.g. desktop browsers) -- true one-tap "send to this exact
- *   contact with image attached" isn't possible via the free wa.me link,
- *   only via the paid WhatsApp Business API, which the spec explicitly
- *   ruled out.
- * - "Download Bill Image": regenerates the same PNG on demand, so old bills
- *   can be re-downloaded from the bill detail page, not just right after
- *   creation.
+ * Renders the off-screen bill template and offers three actions:
+ * - "Share via WhatsApp": uses the Web Share API with the image file
+ *   attached directly, so it lands in the picked chat pre-attached with no
+ *   manual save+attach step. Best when the customer's number is already a
+ *   saved contact, since you pick them from the share sheet.
+ * - "Download & Open [Name]'s Chat": for numbers that AREN'T saved as a
+ *   contact (so they won't show up in the share sheet) -- downloads the
+ *   image and opens wa.me directly to that exact phone number's chat, the
+ *   original flow. True one-tap "send with image already attached to this
+ *   exact number" isn't possible via the free wa.me link, only the paid
+ *   WhatsApp Business API, which the spec explicitly ruled out -- this is
+ *   the manual-attach fallback for that case.
+ * - "Download Bill Image": just regenerates and saves the PNG, no WhatsApp
+ *   involved -- used for re-downloading old bills.
  */
 export function BillImageActions({ bill, customer, items }: Props) {
   const captureRef = useRef<HTMLDivElement>(null);
-  const [busy, setBusy] = useState<"share" | "download" | null>(null);
+  const [busy, setBusy] = useState<"share" | "download-open" | "download" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function generateFile(): Promise<File> {
@@ -46,23 +51,36 @@ export function BillImageActions({ bill, customer, items }: Props) {
     URL.revokeObjectURL(url);
   }
 
-  async function handleShare() {
+  function greeting() {
+    return `Hi ${customer.name}, thank you for your purchase! Bill attached below 🌸`;
+  }
+
+  async function handleShareSheet() {
     setBusy("share");
     setError(null);
     try {
       const file = await generateFile();
-      const message = `Hi ${customer.name}, thank you for your purchase! Bill attached below 🌸`;
-
-      if (typeof navigator.canShare === "function" && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], text: message, title: "AdiSutra Bill" });
-        return;
+      if (!navigator.canShare?.({ files: [file] })) {
+        throw new Error("Sharing images isn't supported on this browser -- use the option below instead.");
       }
-
-      downloadFile(file);
-      const phoneDigits = customer.phone.replace(/\D/g, "");
-      window.open(`https://wa.me/${phoneDigits}?text=${encodeURIComponent(message)}`, "_blank");
+      await navigator.share({ files: [file], text: greeting(), title: "AdiSutra Bill" });
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return; // user cancelled the share sheet
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleDownloadAndOpenChat() {
+    setBusy("download-open");
+    setError(null);
+    try {
+      const file = await generateFile();
+      downloadFile(file);
+      const phoneDigits = customer.phone.replace(/\D/g, "");
+      window.open(`https://wa.me/${phoneDigits}?text=${encodeURIComponent(greeting())}`, "_blank");
+    } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setBusy(null);
@@ -91,17 +109,30 @@ export function BillImageActions({ bill, customer, items }: Props) {
       </div>
 
       <div className="flex flex-col gap-3">
+        {WEB_SHARE_SUPPORTED && (
+          <button
+            onClick={handleShareSheet}
+            disabled={busy !== null}
+            className="rounded-xl bg-sage px-6 py-4 text-lg font-medium text-cream disabled:opacity-60"
+          >
+            {busy === "share" ? "Preparing..." : "Share via WhatsApp (saved number)"}
+          </button>
+        )}
         <button
-          onClick={handleShare}
+          onClick={handleDownloadAndOpenChat}
           disabled={busy !== null}
-          className="rounded-xl bg-sage px-6 py-4 text-lg font-medium text-cream disabled:opacity-60"
+          className={
+            WEB_SHARE_SUPPORTED
+              ? "rounded-xl border-2 border-sage px-6 py-3 text-sage disabled:opacity-60"
+              : "rounded-xl bg-sage px-6 py-4 text-lg font-medium text-cream disabled:opacity-60"
+          }
         >
-          {busy === "share" ? "Preparing..." : "Send on WhatsApp"}
+          {busy === "download-open" ? "Preparing..." : "Download & Open Chat (unsaved number)"}
         </button>
         <button
           onClick={handleDownload}
           disabled={busy !== null}
-          className="rounded-xl border-2 border-sage px-6 py-3 text-sage disabled:opacity-60"
+          className="rounded-xl border-2 border-gold/40 px-6 py-3 text-sage-dark disabled:opacity-60"
         >
           {busy === "download" ? "Preparing..." : "Download Bill Image"}
         </button>
