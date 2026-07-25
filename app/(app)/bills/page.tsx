@@ -4,12 +4,15 @@ import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { NewBillForm } from "@/components/NewBillForm";
 import { AllBillsList } from "@/components/AllBillsList";
+import { ExpensesView } from "@/components/ExpensesView";
 
-type View = "new" | "all";
+type View = "new" | "all" | "expenses";
 
 function BillsContent() {
   const searchParams = useSearchParams();
-  const initialView = searchParams.get("view") === "all" ? "all" : "new";
+  const requestedView = searchParams.get("view");
+  const initialView: View =
+    requestedView === "all" ? "all" : requestedView === "expenses" ? "expenses" : "new";
   const [view, setView] = useState<View>(initialView);
 
   return (
@@ -35,9 +38,17 @@ function BillsContent() {
         >
           All Bills
         </button>
+        <button
+          onClick={() => setView("expenses")}
+          className={`flex-1 py-2 text-sm font-medium ${
+            view === "expenses" ? "bg-sage text-cream" : "bg-white text-sage"
+          }`}
+        >
+          Expenses
+        </button>
       </div>
 
-      {view === "new" ? <NewBillForm /> : <AllBillsList />}
+      {view === "new" ? <NewBillForm /> : view === "all" ? <AllBillsList /> : <ExpensesView />}
     </div>
   );
 }

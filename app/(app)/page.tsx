@@ -38,6 +38,14 @@ export default function HomePage() {
             <StatCard label="Today's Sales" value={`₹${summary.todaySales}`} />
             <StatCard label="This Month" value={`₹${summary.monthSales}`} />
           </div>
+
+          <Link
+            href="/bills?view=expenses"
+            className="flex items-center justify-between rounded-2xl border border-gold/20 bg-white p-4"
+          >
+            <span className="text-sm text-sage-dark/60">This Month&apos;s Expenses</span>
+            <span className="text-lg font-semibold text-sage-dark">₹{summary.monthExpenses}</span>
+          </Link>
           <div
             className={`rounded-2xl border p-4 text-center ${
               summary.totalPendingDues > 0

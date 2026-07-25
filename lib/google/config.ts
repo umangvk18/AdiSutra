@@ -18,6 +18,7 @@ export const SHEET = {
   Bills: "Bills",
   BillItems: "Bill_Items",
   Attributes: "Attributes",
+  Expenses: "Expenses",
 } as const;
 
 export type SheetName = (typeof SHEET)[keyof typeof SHEET];
@@ -63,6 +64,7 @@ export const HEADERS: Record<SheetName, readonly string[]> = {
     "item_status",
   ],
   [SHEET.Attributes]: ["attribute_type", "value"],
+  [SHEET.Expenses]: ["expense_id", "date", "name", "amount", "notes"],
 };
 
 export const ATTRIBUTE_SEED: { attribute_type: string; value: string }[] = [

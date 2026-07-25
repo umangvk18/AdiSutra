@@ -3,6 +3,7 @@ import { readSheet, appendRow, getNextId, updateRowByKey } from "./sheets";
 import { SHEET } from "./config";
 import { listInventory } from "./inventory";
 import { getCustomerById, listCustomers } from "./customers";
+import { getMonthExpenseTotal } from "./expenses";
 import { fullName } from "../customerName";
 import type {
   Bill,
@@ -128,7 +129,11 @@ export async function getCustomerBillSummary(customerId: string): Promise<{
 
 /** Section 6.1: Home tab's daily-glance stats, all computed live. */
 export async function getHomeSummary(): Promise<HomeSummary> {
-  const [bills, customers] = await Promise.all([listBills(), listCustomers()]);
+  const [bills, customers, monthExpenses] = await Promise.all([
+    listBills(),
+    listCustomers(),
+    getMonthExpenseTotal(),
+  ]);
   const customerById = new Map(customers.map((c) => [c.customer_id, c]));
 
   const todayStr = new Date().toISOString().slice(0, 10);
@@ -163,7 +168,7 @@ export async function getHomeSummary(): Promise<HomeSummary> {
     })
     .sort((a, b) => b.days_pending - a.days_pending);
 
-  return { todaySales, monthSales, totalPendingDues, pendingBills };
+  return { todaySales, monthSales, totalPendingDues, monthExpenses, pendingBills };
 }
 
 export type CreateBillInput = {

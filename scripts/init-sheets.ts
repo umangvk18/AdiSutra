@@ -1,4 +1,4 @@
-// One-time setup script: creates the 5 required tabs (with headers) in the
+// One-time setup script: creates the required tabs (with headers) in the
 // AdiSutra spreadsheet if they don't already exist, and seeds the
 // Attributes tab with the starting Region/Material/Design/Vendor values.
 // Safe to re-run -- it won't duplicate sheets or seed data that's already there.
@@ -16,7 +16,14 @@ config({ path: ".env.local", override: true });
 
 import { google } from "googleapis";
 
-const SHEET_NAMES = ["Inventory", "Customers", "Bills", "Bill_Items", "Attributes"] as const;
+const SHEET_NAMES = [
+  "Inventory",
+  "Customers",
+  "Bills",
+  "Bill_Items",
+  "Attributes",
+  "Expenses",
+] as const;
 
 const HEADERS: Record<(typeof SHEET_NAMES)[number], string[]> = {
   Inventory: [
@@ -50,6 +57,7 @@ const HEADERS: Record<(typeof SHEET_NAMES)[number], string[]> = {
   ],
   Bill_Items: ["bill_item_id", "bill_number", "saree_code", "price_at_sale", "item_status"],
   Attributes: ["attribute_type", "value"],
+  Expenses: ["expense_id", "date", "name", "amount", "notes"],
 };
 
 const ATTRIBUTE_SEED: { attribute_type: string; value: string }[] = [

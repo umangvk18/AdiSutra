@@ -78,5 +78,14 @@ export type HomeSummary = {
   todaySales: number;
   monthSales: number;
   totalPendingDues: number;
+  monthExpenses: number;
   pendingBills: PendingBillSummary[];
+};
+
+export type Expense = {
+  expense_id: string;
+  date: string;
+  name: string;
+  amount: number;
+  notes: string;
 };
