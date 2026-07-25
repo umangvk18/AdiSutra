@@ -1,4 +1,5 @@
 import type { Bill, Customer } from "@/lib/types";
+import { fullName } from "@/lib/customerName";
 
 const SAGE = "#4F7C6C";
 const SAGE_DARK = "#33473F";
@@ -68,7 +69,7 @@ export function BillImageTemplate({ bill, customer, items }: Props) {
       <div style={{ padding: "16px 0", fontFamily: "Arial, sans-serif", fontSize: 14 }}>
         <Row label="Bill No" value={bill.bill_number} />
         <Row label="Date" value={bill.date} />
-        <Row label="Customer" value={customer.name} />
+        <Row label="Customer" value={fullName(customer)} />
         <Row label="Phone" value={customer.phone} />
       </div>
 

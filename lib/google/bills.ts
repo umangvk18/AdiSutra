@@ -3,6 +3,7 @@ import { readSheet, appendRow, getNextId, updateRowByKey } from "./sheets";
 import { SHEET } from "./config";
 import { listInventory } from "./inventory";
 import { getCustomerById, listCustomers } from "./customers";
+import { fullName } from "../customerName";
 import type {
   Bill,
   BillItem,
@@ -152,9 +153,10 @@ export async function getHomeSummary(): Promise<HomeSummary> {
         0,
         Math.round((today.getTime() - billDate.getTime()) / (1000 * 60 * 60 * 24))
       );
+      const customer = customerById.get(b.customer_id);
       return {
         bill_number: b.bill_number,
-        customer_name: customerById.get(b.customer_id)?.name ?? "Unknown",
+        customer_name: customer ? fullName(customer) : "Unknown",
         amount_due: b.amount_due,
         days_pending: daysPending,
       };

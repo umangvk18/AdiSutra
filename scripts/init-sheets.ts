@@ -34,7 +34,7 @@ const HEADERS: Record<(typeof SHEET_NAMES)[number], string[]> = {
     "date_sold",
     "bill_number",
   ],
-  Customers: ["customer_id", "name", "phone"],
+  Customers: ["customer_id", "name", "phone", "first_name", "last_name"],
   Bills: [
     "bill_number",
     "customer_id",

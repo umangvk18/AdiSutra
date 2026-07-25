@@ -24,7 +24,8 @@ export type AttributesByType = Record<string, string[]>;
 
 export type Customer = {
   customer_id: string;
-  name: string;
+  first_name: string;
+  last_name: string;
   phone: string;
 };
 

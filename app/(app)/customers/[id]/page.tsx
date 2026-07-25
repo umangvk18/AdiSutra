@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import type { Bill, Customer, PaymentStatus } from "@/lib/types";
+import { fullName } from "@/lib/customerName";
 
 type Summary = {
   customer: Customer;
@@ -54,7 +55,7 @@ export default function CustomerDetailPage() {
           ←
         </button>
         <div>
-          <h1 className="font-serif text-2xl text-sage">{customer.name}</h1>
+          <h1 className="font-serif text-2xl text-sage">{fullName(customer)}</h1>
           <p className="text-sm text-sage-dark/60">{customer.phone}</p>
         </div>
       </header>
@@ -81,7 +82,7 @@ export default function CustomerDetailPage() {
           href={`/bills?customer=${customer.customer_id}`}
           className="mt-4 block rounded-2xl bg-sage py-3 text-center font-medium text-cream"
         >
-          Start New Bill for {customer.name}
+          Start New Bill for {fullName(customer)}
         </Link>
 
         <h2 className="mb-2 mt-6 text-sm font-medium text-sage-dark/80">Purchase History</h2>

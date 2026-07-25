@@ -16,13 +16,14 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json().catch(() => null);
-  const name = typeof body?.name === "string" ? body.name.trim() : "";
+  const firstName = typeof body?.first_name === "string" ? body.first_name.trim() : "";
+  const lastName = typeof body?.last_name === "string" ? body.last_name.trim() : "";
   const phone = typeof body?.phone === "string" ? body.phone.trim() : "";
 
-  if (!name || !phone) {
-    return NextResponse.json({ error: "name and phone are required" }, { status: 400 });
+  if (!firstName || !phone) {
+    return NextResponse.json({ error: "first_name and phone are required" }, { status: 400 });
   }
 
-  const customer = await createCustomer({ name, phone });
+  const customer = await createCustomer({ first_name: firstName, last_name: lastName, phone });
   return NextResponse.json({ customer }, { status: 201 });
 }

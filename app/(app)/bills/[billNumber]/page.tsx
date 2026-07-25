@@ -6,6 +6,7 @@ import type { BillDetail } from "@/lib/types";
 import { photoProxySrc } from "@/lib/photoUrl";
 import { BillImageActions } from "@/components/BillImageActions";
 import type { BillImageItem } from "@/components/BillImageTemplate";
+import { fullName } from "@/lib/customerName";
 
 export default function BillDetailPage() {
   const { billNumber } = useParams<{ billNumber: string }>();
@@ -94,7 +95,7 @@ export default function BillDetailPage() {
 
       <div className="px-4">
         <div className="rounded-2xl border border-gold/20 bg-white p-4">
-          {row("Customer", customer?.name ?? "Unknown")}
+          {row("Customer", customer ? fullName(customer) : "Unknown")}
           {row("Phone", customer?.phone ?? "-")}
           {row("Date", bill.date)}
           {row("Subtotal", `₹${bill.subtotal}`)}

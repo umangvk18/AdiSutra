@@ -38,7 +38,10 @@ export const HEADERS: Record<SheetName, readonly string[]> = {
     "date_sold",
     "bill_number",
   ],
-  [SHEET.Customers]: ["customer_id", "name", "phone"],
+  // "name" is a legacy column, kept for older rows and for at-a-glance
+  // readability in the sheet -- first_name/last_name are the source of
+  // truth going forward (see lib/google/customers.ts).
+  [SHEET.Customers]: ["customer_id", "name", "phone", "first_name", "last_name"],
   [SHEET.Bills]: [
     "bill_number",
     "customer_id",

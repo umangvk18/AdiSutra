@@ -4,12 +4,30 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { Saree, Customer } from "@/lib/types";
 import { photoProxySrc } from "@/lib/photoUrl";
+import { fullName } from "@/lib/customerName";
 import { DiscountInput } from "./DiscountInput";
 import { BillImageActions } from "./BillImageActions";
 import type { BillImageItem } from "./BillImageTemplate";
 
 type PaymentMode = "full" | "partial" | "credit";
 type PaymentMethod = "Cash" | "UPI";
+
+// Contact Picker API: supported on Android Chrome, not standardized/typed in
+// lib.dom.d.ts, and not implemented in Safari/iOS at all (no WebKit support
+// as of this writing) -- feature-detected so the button just doesn't appear
+// where it's unavailable rather than erroring.
+type ContactsManager = {
+  select: (
+    properties: string[],
+    options?: { multiple?: boolean }
+  ) => Promise<Array<{ name?: string[]; tel?: string[] }>>;
+};
+
+function getContactsManager(): ContactsManager | null {
+  if (typeof navigator === "undefined") return null;
+  const nav = navigator as Navigator & { contacts?: ContactsManager };
+  return "contacts" in navigator && nav.contacts ? nav.contacts : null;
+}
 
 function today() {
   return new Date().toISOString().slice(0, 10);
@@ -28,8 +46,10 @@ export function NewBillForm() {
   const [customerQuery, setCustomerQuery] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [showNewCustomer, setShowNewCustomer] = useState(false);
-  const [newCustomerName, setNewCustomerName] = useState("");
+  const [newCustomerFirstName, setNewCustomerFirstName] = useState("");
+  const [newCustomerLastName, setNewCustomerLastName] = useState("");
   const [newCustomerPhone, setNewCustomerPhone] = useState("");
+  const [contactsSupported, setContactsSupported] = useState(false);
 
   const [discountAmount, setDiscountAmount] = useState(0);
   const [paymentMode, setPaymentMode] = useState<PaymentMode>("full");
@@ -67,6 +87,26 @@ export function NewBillForm() {
     if (match) setSelectedCustomer(match);
   }, [presetCustomerId, customers]);
 
+  useEffect(() => {
+    setContactsSupported(getContactsManager() !== null);
+  }, []);
+
+  async function pickContact() {
+    const contactsManager = getContactsManager();
+    if (!contactsManager) return;
+    try {
+      const [contact] = await contactsManager.select(["name", "tel"], { multiple: false });
+      if (!contact) return;
+      const [first, ...rest] = (contact.name?.[0] ?? "").trim().split(/\s+/);
+      setNewCustomerFirstName(first ?? "");
+      setNewCustomerLastName(rest.join(" "));
+      const rawPhone = contact.tel?.[0] ?? "";
+      setNewCustomerPhone(rawPhone.replace(/[^\d+]/g, ""));
+    } catch {
+      // User cancelled the picker, or the API failed -- nothing to do.
+    }
+  }
+
   const selectedSarees = useMemo(
     () => (sarees ?? []).filter((s) => selectedCodes.includes(s.saree_code)),
     [sarees, selectedCodes]
@@ -103,7 +143,7 @@ export function NewBillForm() {
   const filteredCustomers = (customers ?? []).filter((c) => {
     const q = customerQuery.trim().toLowerCase();
     if (!q) return true;
-    return c.name.toLowerCase().includes(q) || c.phone.includes(q);
+    return fullName(c).toLowerCase().includes(q) || c.phone.includes(q);
   });
 
   function toggleSaree(code: string) {
@@ -114,7 +154,8 @@ export function NewBillForm() {
 
   const canSubmit =
     selectedCodes.length > 0 &&
-    (selectedCustomer || (showNewCustomer && newCustomerName.trim() && newCustomerPhone.trim())) &&
+    (selectedCustomer ||
+      (showNewCustomer && newCustomerFirstName.trim() && newCustomerPhone.trim())) &&
     (paymentMode !== "partial" || (Number(partialAmount) > 0 && Number(partialAmount) < totalAmount));
 
   async function handleConfirm() {
@@ -126,7 +167,11 @@ export function NewBillForm() {
         const res = await fetch("/api/customers", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: newCustomerName, phone: newCustomerPhone }),
+          body: JSON.stringify({
+            first_name: newCustomerFirstName,
+            last_name: newCustomerLastName,
+            phone: newCustomerPhone,
+          }),
         });
         if (!res.ok) throw new Error("Failed to create customer");
         const data = await res.json();
@@ -288,7 +333,7 @@ export function NewBillForm() {
         {selectedCustomer ? (
           <div className="flex items-center justify-between rounded-xl border-2 border-sage bg-white px-4 py-3">
             <span>
-              {selectedCustomer.name} · {selectedCustomer.phone}
+              {fullName(selectedCustomer)} · {selectedCustomer.phone}
             </span>
             <button
               type="button"
@@ -300,12 +345,29 @@ export function NewBillForm() {
           </div>
         ) : showNewCustomer ? (
           <div className="flex flex-col gap-2 rounded-xl border-2 border-gold/30 bg-white p-3">
-            <input
-              value={newCustomerName}
-              onChange={(e) => setNewCustomerName(e.target.value)}
-              placeholder="Name"
-              className={inputClass}
-            />
+            {contactsSupported && (
+              <button
+                type="button"
+                onClick={pickContact}
+                className="self-start text-sm text-sage underline"
+              >
+                📇 Import from Contacts
+              </button>
+            )}
+            <div className="flex gap-2">
+              <input
+                value={newCustomerFirstName}
+                onChange={(e) => setNewCustomerFirstName(e.target.value)}
+                placeholder="First Name"
+                className={inputClass}
+              />
+              <input
+                value={newCustomerLastName}
+                onChange={(e) => setNewCustomerLastName(e.target.value)}
+                placeholder="Last Name"
+                className={inputClass}
+              />
+            </div>
             <input
               type="tel"
               inputMode="numeric"
@@ -338,7 +400,7 @@ export function NewBillForm() {
                   onClick={() => setSelectedCustomer(c)}
                   className="block w-full border-b border-gold/10 px-4 py-2 text-left last:border-b-0"
                 >
-                  {c.name} · {c.phone}
+                  {fullName(c)} · {c.phone}
                 </button>
               ))}
             </div>

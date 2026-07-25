@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { Bill, Customer, PaymentStatus } from "@/lib/types";
+import { fullName } from "@/lib/customerName";
 
 const STATUS_STYLES: Record<PaymentStatus, string> = {
   Paid: "bg-sage text-cream",
@@ -37,7 +38,7 @@ export function AllBillsList() {
     const customer = customerById.get(b.customer_id);
     return (
       b.bill_number.toLowerCase().includes(q) ||
-      customer?.name.toLowerCase().includes(q) ||
+      (customer && fullName(customer).toLowerCase().includes(q)) ||
       customer?.phone.includes(q)
     );
   });
@@ -82,7 +83,7 @@ export function AllBillsList() {
                 <div>
                   <p className="font-medium text-sage-dark">{bill.bill_number}</p>
                   <p className="text-sm text-sage-dark/60">
-                    {customer?.name ?? "Unknown"} · {bill.date}
+                    {customer ? fullName(customer) : "Unknown"} · {bill.date}
                   </p>
                 </div>
                 <div className="text-right">

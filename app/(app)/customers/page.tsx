@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { Customer } from "@/lib/types";
+import { fullName } from "@/lib/customerName";
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[] | null>(null);
@@ -17,7 +18,7 @@ export default function CustomersPage() {
   const filtered = (customers ?? []).filter((c) => {
     const q = query.trim().toLowerCase();
     if (!q) return true;
-    return c.name.toLowerCase().includes(q) || c.phone.includes(q);
+    return fullName(c).toLowerCase().includes(q) || c.phone.includes(q);
   });
 
   return (
@@ -48,7 +49,7 @@ export default function CustomersPage() {
                 href={`/customers/${c.customer_id}`}
                 className="flex items-center justify-between rounded-xl border border-gold/20 bg-white px-4 py-3"
               >
-                <span className="font-medium text-sage-dark">{c.name}</span>
+                <span className="font-medium text-sage-dark">{fullName(c)}</span>
                 <span className="text-sm text-sage-dark/60">{c.phone}</span>
               </Link>
             ))}

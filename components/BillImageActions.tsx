@@ -37,7 +37,24 @@ export function BillImageActions({ bill, customer, items }: Props) {
 
   async function generateFile(): Promise<File> {
     if (!captureRef.current) throw new Error("Nothing to capture");
-    const blob = await toBlob(captureRef.current, { pixelRatio: 2 });
+
+    // Safari (notably on iOS) can capture the DOM before an off-screen
+    // <img> has actually finished decoding, leaving it blank in the
+    // output -- wait for every image inside the capture area to be ready
+    // first, and cache-bust so a stale/partial cached copy isn't reused.
+    const images = Array.from(captureRef.current.querySelectorAll("img"));
+    await Promise.all(
+      images.map((img) =>
+        img.complete
+          ? img.decode().catch(() => {})
+          : new Promise<void>((resolve) => {
+              img.onload = () => resolve();
+              img.onerror = () => resolve();
+            })
+      )
+    );
+
+    const blob = await toBlob(captureRef.current, { pixelRatio: 2, cacheBust: true });
     if (!blob) throw new Error("Failed to generate the bill image");
     return new File([blob], `${bill.bill_number}.png`, { type: "image/png" });
   }
@@ -52,7 +69,7 @@ export function BillImageActions({ bill, customer, items }: Props) {
   }
 
   function greeting() {
-    return `Hi ${customer.name}, thank you for your purchase! Bill attached below 🌸`;
+    return `Hi ${customer.first_name}, thank you for your purchase! Bill attached below 🌸`;
   }
 
   async function handleShareSheet() {
