@@ -12,6 +12,7 @@ function parseExpense(row: Record<string, string>): Expense {
     name: row.name,
     amount: Number(row.amount) || 0,
     notes: row.notes ?? "",
+    bill_number: row.bill_number ?? "",
   };
 }
 
@@ -20,11 +21,17 @@ export async function listExpenses(): Promise<Expense[]> {
   return rows.map(parseExpense).sort((a, b) => (a.date < b.date ? 1 : -1));
 }
 
+export async function getExpensesForBill(billNumber: string): Promise<Expense[]> {
+  const expenses = await listExpenses();
+  return expenses.filter((e) => e.bill_number === billNumber);
+}
+
 export type NewExpenseInput = {
   date: string;
   name: string;
   amount: number;
   notes: string;
+  bill_number?: string;
 };
 
 export async function createExpense(input: NewExpenseInput): Promise<Expense> {
@@ -34,6 +41,7 @@ export async function createExpense(input: NewExpenseInput): Promise<Expense> {
     name: input.name.trim(),
     amount: input.amount,
     notes: input.notes.trim(),
+    bill_number: input.bill_number ?? "",
   }));
   return row as unknown as Expense;
 }

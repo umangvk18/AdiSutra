@@ -42,7 +42,7 @@ export default function BillDetailPage() {
     );
   }
 
-  const { bill, customer, items } = detail;
+  const { bill, customer, items, expenses } = detail;
 
   async function handleLogPayment(amount: number) {
     setLoggingPayment(true);
@@ -171,6 +171,25 @@ export default function BillDetailPage() {
             </div>
           ))}
         </div>
+
+        {expenses.length > 0 && (
+          <>
+            <h2 className="mb-2 mt-4 text-sm font-medium text-sage-dark/80">
+              Bill Expenses <span className="font-normal text-sage-dark/50">(business cost, not charged to customer)</span>
+            </h2>
+            <div className="flex flex-col gap-2">
+              {expenses.map((e) => (
+                <div
+                  key={e.expense_id}
+                  className="flex items-center justify-between rounded-xl border border-gold/20 bg-white px-4 py-3"
+                >
+                  <span className="text-sm text-sage-dark">{e.name}</span>
+                  <span className="font-medium text-terracotta">₹{e.amount}</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
 
         {customer && (
           <div className="mt-6">

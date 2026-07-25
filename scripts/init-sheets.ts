@@ -57,7 +57,7 @@ const HEADERS: Record<(typeof SHEET_NAMES)[number], string[]> = {
   ],
   Bill_Items: ["bill_item_id", "bill_number", "saree_code", "price_at_sale", "item_status"],
   Attributes: ["attribute_type", "value"],
-  Expenses: ["expense_id", "date", "name", "amount", "notes"],
+  Expenses: ["expense_id", "date", "name", "amount", "notes", "bill_number"],
 };
 
 const ATTRIBUTE_SEED: { attribute_type: string; value: string }[] = [

@@ -22,6 +22,9 @@ export async function POST(request: Request) {
   const amountPaid = Number(body?.amount_paid ?? 0);
   const date = typeof body?.date === "string" ? body.date : "";
   const paymentMethod = body?.payment_method;
+  const expensesRaw: Array<{ name?: unknown; amount?: unknown }> = Array.isArray(body?.expenses)
+    ? body.expenses
+    : [];
 
   if (
     typeof customerId !== "string" ||
@@ -32,7 +35,10 @@ export async function POST(request: Request) {
     !Number.isFinite(discount) ||
     !Number.isFinite(amountPaid) ||
     !date ||
-    (paymentMethod !== "Cash" && paymentMethod !== "UPI")
+    (paymentMethod !== "Cash" && paymentMethod !== "UPI") ||
+    !expensesRaw.every(
+      (e) => typeof e?.name === "string" && Number.isFinite(Number(e?.amount))
+    )
   ) {
     return NextResponse.json({ error: "Invalid bill payload" }, { status: 400 });
   }
@@ -45,6 +51,7 @@ export async function POST(request: Request) {
       amount_paid: amountPaid,
       date,
       payment_method: paymentMethod,
+      expenses: expensesRaw.map((e) => ({ name: String(e.name), amount: Number(e.amount) })),
     });
     return NextResponse.json(result, { status: 201 });
   } catch (err) {

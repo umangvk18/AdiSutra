@@ -56,6 +56,14 @@ export function NewBillForm() {
   const [partialAmount, setPartialAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("Cash");
 
+  // Optional, bill-specific costs (Fall Pico, freight, etc). Most bills
+  // won't have any -- these are the business's own cost, tracked for profit
+  // visibility, and don't affect what the customer is charged.
+  const [billExpenses, setBillExpenses] = useState<{ name: string; amount: string }[]>([]);
+  const [showAddExpense, setShowAddExpense] = useState(false);
+  const [draftExpenseName, setDraftExpenseName] = useState("");
+  const [draftExpenseAmount, setDraftExpenseAmount] = useState("");
+
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successBill, setSuccessBill] = useState<{
@@ -152,6 +160,18 @@ export function NewBillForm() {
     );
   }
 
+  function addBillExpense() {
+    if (!draftExpenseName.trim() || !(Number(draftExpenseAmount) > 0)) return;
+    setBillExpenses((prev) => [...prev, { name: draftExpenseName.trim(), amount: draftExpenseAmount }]);
+    setDraftExpenseName("");
+    setDraftExpenseAmount("");
+    setShowAddExpense(false);
+  }
+
+  function removeBillExpense(index: number) {
+    setBillExpenses((prev) => prev.filter((_, i) => i !== index));
+  }
+
   const canSubmit =
     selectedCodes.length > 0 &&
     (selectedCustomer ||
@@ -190,6 +210,7 @@ export function NewBillForm() {
           amount_paid: amountPaid,
           date,
           payment_method: paymentMethod,
+          expenses: billExpenses.map((e) => ({ name: e.name, amount: Number(e.amount) })),
         }),
       });
       if (!res.ok) {
@@ -472,6 +493,79 @@ export function NewBillForm() {
             </button>
           ))}
         </div>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <label className="text-sm font-medium text-sage-dark/80">
+          Bill Expenses <span className="font-normal text-sage-dark/50">(optional -- e.g. Fall Pico, freight)</span>
+        </label>
+
+        {billExpenses.length > 0 && (
+          <div className="flex flex-col gap-1">
+            {billExpenses.map((e, i) => (
+              <div
+                key={i}
+                className="flex items-center justify-between rounded-xl border border-gold/20 bg-white px-4 py-2 text-sm"
+              >
+                <span className="text-sage-dark">{e.name}</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-terracotta">₹{e.amount}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeBillExpense(i)}
+                    className="text-sage-dark/50"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {showAddExpense ? (
+          <div className="flex flex-col gap-2 rounded-xl border-2 border-gold/30 bg-white p-3">
+            <input
+              value={draftExpenseName}
+              onChange={(e) => setDraftExpenseName(e.target.value)}
+              placeholder="Expense name (e.g. Fall Pico)"
+              className={inputClass}
+            />
+            <input
+              type="number"
+              inputMode="decimal"
+              value={draftExpenseAmount}
+              onChange={(e) => setDraftExpenseAmount(e.target.value)}
+              placeholder="Amount ₹"
+              className={inputClass}
+            />
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={addBillExpense}
+                disabled={!draftExpenseName.trim() || !(Number(draftExpenseAmount) > 0)}
+                className="flex-1 rounded-xl bg-sage py-2 text-sm font-medium text-cream disabled:opacity-50"
+              >
+                Add
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowAddExpense(false)}
+                className="rounded-xl border-2 border-gold/40 px-4 py-2 text-sm text-sage-dark"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setShowAddExpense(true)}
+            className="self-start text-sm text-sage underline"
+          >
+            + Add Bill Expense
+          </button>
+        )}
       </div>
 
       {selectedCodes.length > 0 && (

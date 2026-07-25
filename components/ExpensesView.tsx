@@ -143,6 +143,7 @@ export function ExpensesView() {
                 <p className="text-xs text-sage-dark/60">
                   {e.date}
                   {e.notes && ` · ${e.notes}`}
+                  {e.bill_number && ` · ${e.bill_number}`}
                 </p>
               </div>
               <p className="font-medium text-terracotta">₹{e.amount}</p>

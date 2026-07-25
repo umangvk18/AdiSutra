@@ -65,6 +65,7 @@ export type BillDetail = {
   bill: Bill;
   customer: Customer | null;
   items: BillDetailItem[];
+  expenses: Expense[];
 };
 
 export type PendingBillSummary = {
@@ -88,4 +89,5 @@ export type Expense = {
   name: string;
   amount: number;
   notes: string;
+  bill_number: string;
 };

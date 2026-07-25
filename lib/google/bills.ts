@@ -3,7 +3,7 @@ import { readSheet, appendRow, getNextId, updateRowByKey } from "./sheets";
 import { SHEET } from "./config";
 import { listInventory } from "./inventory";
 import { getCustomerById, listCustomers } from "./customers";
-import { getMonthExpenseTotal } from "./expenses";
+import { getMonthExpenseTotal, getExpensesForBill, createExpense } from "./expenses";
 import { fullName } from "../customerName";
 import type {
   Bill,
@@ -14,6 +14,7 @@ import type {
   Customer,
   HomeSummary,
   PendingBillSummary,
+  Expense,
 } from "../types";
 
 export type { Bill, BillItem };
@@ -64,10 +65,11 @@ export async function getBillDetail(billNumber: string): Promise<BillDetail | nu
   const bill = await getBillByNumber(billNumber);
   if (!bill) return null;
 
-  const [customer, items, sarees] = await Promise.all([
+  const [customer, items, sarees, expenses] = await Promise.all([
     getCustomerById(bill.customer_id),
     getBillItems(billNumber),
     listInventory(),
+    getExpensesForBill(billNumber),
   ]);
 
   const sareeByCode = new Map(sarees.map((s) => [s.saree_code, s]));
@@ -81,7 +83,7 @@ export async function getBillDetail(billNumber: string): Promise<BillDetail | nu
     };
   });
 
-  return { bill, customer, items: enrichedItems };
+  return { bill, customer, items: enrichedItems, expenses };
 }
 
 /**
@@ -178,6 +180,11 @@ export type CreateBillInput = {
   amount_paid: number;
   date: string;
   payment_method: PaymentMethod;
+  // Optional Fall Pico/freight-style costs tied to this specific bill --
+  // most bills won't have any. These are the business's own cost, tracked
+  // for profit visibility; they don't affect what the customer is charged
+  // (subtotal/total/amount_due are untouched).
+  expenses?: { name: string; amount: number }[];
 };
 
 /**
@@ -189,7 +196,7 @@ export type CreateBillInput = {
  */
 export async function createBill(
   input: CreateBillInput
-): Promise<{ bill: Bill; billItems: BillItem[] }> {
+): Promise<{ bill: Bill; billItems: BillItem[]; expenses: Expense[] }> {
   if (input.saree_codes.length === 0) {
     throw new Error("Select at least one saree");
   }
@@ -250,5 +257,18 @@ export async function createBill(
     });
   }
 
-  return { bill, billItems };
+  const expenses: Expense[] = [];
+  for (const draft of input.expenses ?? []) {
+    if (!draft.name.trim() || draft.amount <= 0) continue;
+    const expense = await createExpense({
+      date: input.date,
+      name: draft.name,
+      amount: draft.amount,
+      notes: "",
+      bill_number: billNumber,
+    });
+    expenses.push(expense);
+  }
+
+  return { bill, billItems, expenses };
 }

@@ -64,7 +64,9 @@ export const HEADERS: Record<SheetName, readonly string[]> = {
     "item_status",
   ],
   [SHEET.Attributes]: ["attribute_type", "value"],
-  [SHEET.Expenses]: ["expense_id", "date", "name", "amount", "notes"],
+  // bill_number is optional -- blank for general/standalone expenses,
+  // populated for a Fall Pico/freight-style cost tied to one specific bill.
+  [SHEET.Expenses]: ["expense_id", "date", "name", "amount", "notes", "bill_number"],
 };
 
 export const ATTRIBUTE_SEED: { attribute_type: string; value: string }[] = [
