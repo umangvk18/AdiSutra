@@ -6,7 +6,7 @@ import type { Saree, Customer } from "@/lib/types";
 import { photoProxySrc } from "@/lib/photoUrl";
 import { fullName } from "@/lib/customerName";
 import { BillImageActions } from "./BillImageActions";
-import type { BillImageItem } from "./BillImageTemplate";
+import type { BillImageItem } from "@/lib/renderBillImage";
 
 type PaymentMode = "full" | "partial" | "credit";
 type PaymentMethod = "Cash" | "UPI";

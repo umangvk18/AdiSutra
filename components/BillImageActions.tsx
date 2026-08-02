@@ -1,9 +1,10 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { toBlob } from "html-to-image";
+import { useState } from "react";
 import type { Bill, Customer } from "@/lib/types";
-import { BillImageTemplate, type BillImageItem } from "./BillImageTemplate";
+import { renderBillToBlob, type BillImageItem } from "@/lib/renderBillImage";
+
+export type { BillImageItem };
 
 type Props = {
   bill: Bill;
@@ -15,7 +16,8 @@ const WEB_SHARE_SUPPORTED =
   typeof navigator !== "undefined" && typeof navigator.share === "function";
 
 /**
- * Renders the off-screen bill template and offers three actions:
+ * Generates the bill image on a <canvas> (see lib/renderBillImage.ts) and
+ * offers three actions:
  * - "Share via WhatsApp": uses the Web Share API with the image file
  *   attached directly, so it lands in the picked chat pre-attached with no
  *   manual save+attach step. Best when the customer's number is already a
@@ -31,31 +33,11 @@ const WEB_SHARE_SUPPORTED =
  *   involved -- used for re-downloading old bills.
  */
 export function BillImageActions({ bill, customer, items }: Props) {
-  const captureRef = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState<"share" | "download-open" | "download" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function generateFile(): Promise<File> {
-    if (!captureRef.current) throw new Error("Nothing to capture");
-
-    // Safari (notably on iOS) can capture the DOM before an off-screen
-    // <img> has actually finished decoding, leaving it blank in the
-    // output -- wait for every image inside the capture area to be ready
-    // first, and cache-bust so a stale/partial cached copy isn't reused.
-    const images = Array.from(captureRef.current.querySelectorAll("img"));
-    await Promise.all(
-      images.map((img) =>
-        img.complete
-          ? img.decode().catch(() => {})
-          : new Promise<void>((resolve) => {
-              img.onload = () => resolve();
-              img.onerror = () => resolve();
-            })
-      )
-    );
-
-    const blob = await toBlob(captureRef.current, { pixelRatio: 2, cacheBust: true });
-    if (!blob) throw new Error("Failed to generate the bill image");
+    const blob = await renderBillToBlob(bill, customer, items);
     return new File([blob], `${bill.bill_number}.png`, { type: "image/png" });
   }
 
@@ -118,43 +100,35 @@ export function BillImageActions({ bill, customer, items }: Props) {
   }
 
   return (
-    <>
-      <div className="fixed left-[-9999px] top-0">
-        <div ref={captureRef}>
-          <BillImageTemplate bill={bill} customer={customer} items={items} />
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-3">
-        {WEB_SHARE_SUPPORTED && (
-          <button
-            onClick={handleShareSheet}
-            disabled={busy !== null}
-            className="rounded-xl bg-sage px-6 py-4 text-lg font-medium text-cream disabled:opacity-60"
-          >
-            {busy === "share" ? "Preparing..." : "Share via WhatsApp (saved number)"}
-          </button>
-        )}
+    <div className="flex flex-col gap-3">
+      {WEB_SHARE_SUPPORTED && (
         <button
-          onClick={handleDownloadAndOpenChat}
+          onClick={handleShareSheet}
           disabled={busy !== null}
-          className={
-            WEB_SHARE_SUPPORTED
-              ? "rounded-xl border-2 border-sage px-6 py-3 text-sage disabled:opacity-60"
-              : "rounded-xl bg-sage px-6 py-4 text-lg font-medium text-cream disabled:opacity-60"
-          }
+          className="rounded-xl bg-sage px-6 py-4 text-lg font-medium text-cream disabled:opacity-60"
         >
-          {busy === "download-open" ? "Preparing..." : "Download & Open Chat (unsaved number)"}
+          {busy === "share" ? "Preparing..." : "Share via WhatsApp (saved number)"}
         </button>
-        <button
-          onClick={handleDownload}
-          disabled={busy !== null}
-          className="rounded-xl border-2 border-gold/40 px-6 py-3 text-sage-dark disabled:opacity-60"
-        >
-          {busy === "download" ? "Preparing..." : "Download Bill Image"}
-        </button>
-        {error && <p className="text-center text-terracotta">{error}</p>}
-      </div>
-    </>
+      )}
+      <button
+        onClick={handleDownloadAndOpenChat}
+        disabled={busy !== null}
+        className={
+          WEB_SHARE_SUPPORTED
+            ? "rounded-xl border-2 border-sage px-6 py-3 text-sage disabled:opacity-60"
+            : "rounded-xl bg-sage px-6 py-4 text-lg font-medium text-cream disabled:opacity-60"
+        }
+      >
+        {busy === "download-open" ? "Preparing..." : "Download & Open Chat (unsaved number)"}
+      </button>
+      <button
+        onClick={handleDownload}
+        disabled={busy !== null}
+        className="rounded-xl border-2 border-gold/40 px-6 py-3 text-sage-dark disabled:opacity-60"
+      >
+        {busy === "download" ? "Preparing..." : "Download Bill Image"}
+      </button>
+      {error && <p className="text-center text-terracotta">{error}</p>}
+    </div>
   );
 }

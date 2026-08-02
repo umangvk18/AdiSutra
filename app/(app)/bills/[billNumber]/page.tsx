@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import type { BillDetail } from "@/lib/types";
 import { photoProxySrc } from "@/lib/photoUrl";
 import { BillImageActions } from "@/components/BillImageActions";
-import type { BillImageItem } from "@/components/BillImageTemplate";
+import type { BillImageItem } from "@/lib/renderBillImage";
 import { fullName } from "@/lib/customerName";
 
 export default function BillDetailPage() {
