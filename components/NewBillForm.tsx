@@ -52,6 +52,9 @@ export function NewBillForm() {
   const [newCustomerPhone, setNewCustomerPhone] = useState("");
   const [contactsSupported, setContactsSupported] = useState(false);
 
+  // Defaults to today, but editable -- for backdating a bill made in the past.
+  const [billDate, setBillDate] = useState(today());
+
   // Per-saree discount (e.g. 5% off one, 10% off another) rather than one
   // flat/percent discount applied to the whole bill.
   const [itemDiscounts, setItemDiscounts] = useState<Record<string, ItemDiscount>>({});
@@ -221,7 +224,7 @@ export function NewBillForm() {
       }
       if (!customer) throw new Error("Select or add a customer");
 
-      const date = today();
+      const date = billDate;
       const res = await fetch("/api/bills", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -377,6 +380,17 @@ export function NewBillForm() {
           )}
         </p>
       )}
+
+      <div className="flex flex-col gap-1">
+        <label className="text-sm font-medium text-sage-dark/80">Bill Date</label>
+        <input
+          type="date"
+          value={billDate}
+          max={today()}
+          onChange={(e) => setBillDate(e.target.value)}
+          className="w-full rounded-xl border-2 border-gold/30 bg-white px-4 py-3 text-base text-sage-dark outline-none focus:border-sage"
+        />
+      </div>
 
       <div className="flex flex-col gap-1">
         <label className="text-sm font-medium text-sage-dark/80">Customer</label>

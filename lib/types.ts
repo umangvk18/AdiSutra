@@ -75,11 +75,18 @@ export type PendingBillSummary = {
   days_pending: number;
 };
 
+export type MonthlySales = {
+  month: string;
+  total: number;
+};
+
 export type HomeSummary = {
   todaySales: number;
   monthSales: number;
   totalPendingDues: number;
   monthExpenses: number;
+  avgInventoryDays: number;
+  monthlySales: MonthlySales[];
   pendingBills: PendingBillSummary[];
 };
 

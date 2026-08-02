@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import type { HomeSummary } from "@/lib/types";
+import { MonthlySalesChart } from "@/components/MonthlySalesChart";
 
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
@@ -37,7 +38,10 @@ export default function HomePage() {
           <div className="flex gap-3">
             <StatCard label="Today's Sales" value={`₹${summary.todaySales}`} />
             <StatCard label="This Month" value={`₹${summary.monthSales}`} />
+            <StatCard label="Avg. Stock Days" value={String(summary.avgInventoryDays)} />
           </div>
+
+          <MonthlySalesChart data={summary.monthlySales} />
 
           <Link
             href="/bills?view=expenses"

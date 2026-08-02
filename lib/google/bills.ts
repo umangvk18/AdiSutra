@@ -1,7 +1,7 @@
 import "server-only";
 import { readSheet, appendRow, getNextId, updateRowByKey } from "./sheets";
 import { SHEET } from "./config";
-import { listInventory } from "./inventory";
+import { listInventory, getAverageInventoryDays } from "./inventory";
 import { getCustomerById, listCustomers } from "./customers";
 import { getMonthExpenseTotal, getExpensesForBill, createExpense } from "./expenses";
 import { fullName } from "../customerName";
@@ -14,6 +14,7 @@ import type {
   Customer,
   HomeSummary,
   PendingBillSummary,
+  MonthlySales,
   Expense,
 } from "../types";
 
@@ -129,12 +130,40 @@ export async function getCustomerBillSummary(customerId: string): Promise<{
   return { customer, bills, totalSpent, totalDue };
 }
 
+const MONTH_LABELS = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+/** Trailing 12 months of sales (active bills only), oldest to newest. */
+function computeMonthlySales(activeBills: Bill[]): MonthlySales[] {
+  const now = new Date();
+  const months: { key: string; label: string }[] = [];
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    months.push({ key, label: `${MONTH_LABELS[d.getMonth()]} ${d.getFullYear()}` });
+  }
+
+  const totalsByMonth = new Map<string, number>();
+  for (const bill of activeBills) {
+    const key = bill.date.slice(0, 7);
+    totalsByMonth.set(key, (totalsByMonth.get(key) ?? 0) + bill.total_amount);
+  }
+
+  return months.map((m) => ({
+    month: m.label,
+    total: totalsByMonth.get(m.key) ?? 0,
+  }));
+}
+
 /** Section 6.1: Home tab's daily-glance stats, all computed live. */
 export async function getHomeSummary(): Promise<HomeSummary> {
-  const [bills, customers, monthExpenses] = await Promise.all([
+  const [bills, customers, monthExpenses, avgInventoryDays] = await Promise.all([
     listBills(),
     listCustomers(),
     getMonthExpenseTotal(),
+    getAverageInventoryDays(),
   ]);
   const customerById = new Map(customers.map((c) => [c.customer_id, c]));
 
@@ -148,6 +177,7 @@ export async function getHomeSummary(): Promise<HomeSummary> {
   const monthSales = activeBills
     .filter((b) => b.date.startsWith(monthPrefix))
     .reduce((sum, b) => sum + b.total_amount, 0);
+  const monthlySales = computeMonthlySales(activeBills);
 
   const dueBills = bills.filter((b) => b.amount_due > 0);
   const totalPendingDues = dueBills.reduce((sum, b) => sum + b.amount_due, 0);
@@ -170,7 +200,15 @@ export async function getHomeSummary(): Promise<HomeSummary> {
     })
     .sort((a, b) => b.days_pending - a.days_pending);
 
-  return { todaySales, monthSales, totalPendingDues, monthExpenses, pendingBills };
+  return {
+    todaySales,
+    monthSales,
+    totalPendingDues,
+    monthExpenses,
+    avgInventoryDays,
+    monthlySales,
+    pendingBills,
+  };
 }
 
 export type CreateBillInput = {

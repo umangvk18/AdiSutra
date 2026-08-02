@@ -89,6 +89,24 @@ export async function createSaree(input: NewSareeInput): Promise<Saree> {
   return parseSaree(row as unknown as Record<string, string>);
 }
 
+/** Section 9-style stock aging, condensed to one number: the average number
+ * of days currently-In-Stock sarees have been sitting, rounded to the
+ * nearest integer. */
+export async function getAverageInventoryDays(): Promise<number> {
+  const inStock = await listInventory({ status: "In Stock" });
+  if (inStock.length === 0) return 0;
+
+  const today = Date.now();
+  const totalDays = inStock.reduce((sum, s) => {
+    const received = new Date(s.date_received).getTime();
+    if (Number.isNaN(received)) return sum;
+    const days = Math.max(0, (today - received) / (1000 * 60 * 60 * 24));
+    return sum + days;
+  }, 0);
+
+  return Math.round(totalDays / inStock.length);
+}
+
 export type UpdateSareeInput = {
   photo_url: string;
   region: string;
