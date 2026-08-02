@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import type { BillDetail } from "@/lib/types";
 import { photoProxySrc } from "@/lib/photoUrl";
 import { BillImageActions } from "@/components/BillImageActions";
@@ -107,6 +108,15 @@ export default function BillDetailPage() {
           {row("Payment Method", bill.payment_method)}
         </div>
 
+        {bill.bill_status !== "Returned" && (
+          <Link
+            href={`/bills/${billNumber}/edit`}
+            className="mt-4 block rounded-2xl border-2 border-sage py-3 text-center font-medium text-sage"
+          >
+            Edit Bill (Return / Exchange)
+          </Link>
+        )}
+
         {bill.amount_due > 0 && (
           <div className="mt-4 rounded-2xl border border-gold/20 bg-white p-4">
             <h2 className="mb-2 text-sm font-medium text-sage-dark/80">Log Payment</h2>
@@ -197,10 +207,6 @@ export default function BillDetailPage() {
             <BillImageActions bill={bill} customer={customer} items={billImageItems} />
           </div>
         )}
-
-        <p className="mt-4 text-center text-xs text-sage-dark/50">
-          Process Return is coming in Phase 2.
-        </p>
       </div>
     </div>
   );

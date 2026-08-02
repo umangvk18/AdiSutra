@@ -317,3 +317,137 @@ export async function createBill(
 
   return { bill, billItems, expenses };
 }
+
+export type BillRevisionInput = {
+  // Plain returns: saree goes back to In Stock, drops off the bill entirely.
+  returns: string[];
+  // Exchanges: old saree goes back to In Stock, new saree becomes Sold on
+  // this same bill at its own (possibly discounted) price -- can be a
+  // different price entirely, not necessarily matching the original.
+  exchanges: { old_saree_code: string; new_saree_code: string; price_at_sale: number }[];
+  // Cash that actually changes hands right now, as a result of this
+  // revision -- only one of these is normally nonzero, but both are
+  // accepted for flexibility. amount_paid is adjusted by
+  // (collected_now - refunded_now) rather than storing a separate
+  // "refund owed" figure, so it always reflects true net cash received.
+  collected_now: number;
+  refunded_now: number;
+};
+
+/**
+ * Implements returns and exchanges (Phase 2 v1) as one combined edit: for
+ * each item on a bill you can Keep it, Return it (back to In Stock, off the
+ * bill), or Exchange it for a different In-Stock saree (old one goes back
+ * to stock, new one becomes Sold on this same bill). Recomputes the bill's
+ * subtotal/discount/total/amount_paid/amount_due/payment_status from
+ * scratch afterward. bill_status becomes "Returned" only if nothing Sold
+ * remains on the bill; otherwise "Partially Returned" -- an exchange is
+ * modeled as a return + a fresh sale on the same bill, so it fits the
+ * existing status/history model without a new status value: the item-level
+ * Returned/Sold rows in Bill_Items already tell the full story.
+ */
+export async function reviseBill(
+  billNumber: string,
+  revision: BillRevisionInput
+): Promise<{ bill: Bill }> {
+  const bill = await getBillByNumber(billNumber);
+  if (!bill) throw new Error(`Bill ${billNumber} not found`);
+  if (bill.bill_status === "Returned") {
+    throw new Error("This bill has already been fully returned -- nothing left to edit");
+  }
+  if (revision.returns.length === 0 && revision.exchanges.length === 0) {
+    throw new Error("Mark at least one item as Returned or Exchanged");
+  }
+
+  const billItems = await getBillItems(billNumber);
+  const soldItems = billItems.filter((i) => i.item_status === "Sold");
+  const soldByCode = new Map(soldItems.map((i) => [i.saree_code, i]));
+
+  for (const code of [...revision.returns, ...revision.exchanges.map((e) => e.old_saree_code)]) {
+    if (!soldByCode.has(code)) {
+      throw new Error(`${code} is not currently Sold on this bill`);
+    }
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  const inventory = await listInventory();
+  const sareeByCode = new Map(inventory.map((s) => [s.saree_code, s]));
+
+  for (const code of revision.returns) {
+    const item = soldByCode.get(code)!;
+    await updateRowByKey(SHEET.BillItems, "bill_item_id", item.bill_item_id, {
+      item_status: "Returned",
+    });
+    await updateRowByKey(SHEET.Inventory, "saree_code", code, {
+      status: "In Stock",
+      date_sold: "",
+      bill_number: "",
+    });
+  }
+
+  for (const { old_saree_code, new_saree_code, price_at_sale } of revision.exchanges) {
+    const oldItem = soldByCode.get(old_saree_code)!;
+    const newSaree = sareeByCode.get(new_saree_code);
+    if (!newSaree) throw new Error(`Saree ${new_saree_code} not found`);
+    if (newSaree.status !== "In Stock") {
+      throw new Error(`Saree ${new_saree_code} is no longer In Stock`);
+    }
+
+    await updateRowByKey(SHEET.BillItems, "bill_item_id", oldItem.bill_item_id, {
+      item_status: "Returned",
+    });
+    await updateRowByKey(SHEET.Inventory, "saree_code", old_saree_code, {
+      status: "In Stock",
+      date_sold: "",
+      bill_number: "",
+    });
+
+    const clampedPrice = Math.max(0, Math.min(price_at_sale, newSaree.selling_price));
+    const newBillItemId = await getNextId(SHEET.BillItems, "bill_item_id", "BI-", 5);
+    await appendRow(SHEET.BillItems, {
+      bill_item_id: newBillItemId,
+      bill_number: billNumber,
+      saree_code: new_saree_code,
+      price_at_sale: clampedPrice,
+      item_status: "Sold",
+    });
+    await updateRowByKey(SHEET.Inventory, "saree_code", new_saree_code, {
+      status: "Sold",
+      date_sold: today,
+      bill_number: billNumber,
+    });
+  }
+
+  const refreshedItems = await getBillItems(billNumber);
+  const stillSold = refreshedItems.filter((i) => i.item_status === "Sold");
+
+  const newSubtotal = stillSold.reduce((sum, i) => {
+    const saree = sareeByCode.get(i.saree_code);
+    return sum + (saree?.selling_price ?? i.price_at_sale);
+  }, 0);
+  const newTotal = stillSold.reduce((sum, i) => sum + i.price_at_sale, 0);
+  const newDiscount = Math.max(0, newSubtotal - newTotal);
+
+  const newAmountPaid = Math.max(
+    0,
+    Math.min(newTotal, bill.amount_paid + revision.collected_now - revision.refunded_now)
+  );
+  const newAmountDue = Math.max(0, newTotal - newAmountPaid);
+  const newPaymentStatus: PaymentStatus =
+    newAmountDue <= 0 ? "Paid" : newAmountPaid > 0 ? "Partial" : "Credit";
+  const newBillStatus: Bill["bill_status"] = stillSold.length === 0 ? "Returned" : "Partially Returned";
+
+  await updateRowByKey(SHEET.Bills, "bill_number", billNumber, {
+    subtotal: newSubtotal,
+    discount: newDiscount,
+    total_amount: newTotal,
+    amount_paid: newAmountPaid,
+    amount_due: newAmountDue,
+    payment_status: newPaymentStatus,
+    bill_status: newBillStatus,
+  });
+
+  const updated = await getBillByNumber(billNumber);
+  if (!updated) throw new Error("Bill vanished during revision");
+  return { bill: updated };
+}
