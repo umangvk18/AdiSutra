@@ -5,12 +5,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 import type { Saree, Customer } from "@/lib/types";
 import { photoProxySrc } from "@/lib/photoUrl";
 import { fullName } from "@/lib/customerName";
-import { DiscountInput } from "./DiscountInput";
 import { BillImageActions } from "./BillImageActions";
 import type { BillImageItem } from "./BillImageTemplate";
 
 type PaymentMode = "full" | "partial" | "credit";
 type PaymentMethod = "Cash" | "UPI";
+type DiscountMode = "flat" | "percent";
+type ItemDiscount = { mode: DiscountMode; value: string };
 
 // Contact Picker API: supported on Android Chrome, not standardized/typed in
 // lib.dom.d.ts, and not implemented in Safari/iOS at all (no WebKit support
@@ -51,7 +52,9 @@ export function NewBillForm() {
   const [newCustomerPhone, setNewCustomerPhone] = useState("");
   const [contactsSupported, setContactsSupported] = useState(false);
 
-  const [discountAmount, setDiscountAmount] = useState(0);
+  // Per-saree discount (e.g. 5% off one, 10% off another) rather than one
+  // flat/percent discount applied to the whole bill.
+  const [itemDiscounts, setItemDiscounts] = useState<Record<string, ItemDiscount>>({});
   const [paymentMode, setPaymentMode] = useState<PaymentMode>("full");
   const [partialAmount, setPartialAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("Cash");
@@ -119,8 +122,27 @@ export function NewBillForm() {
     () => (sarees ?? []).filter((s) => selectedCodes.includes(s.saree_code)),
     [sarees, selectedCodes]
   );
+
+  function itemFinalPrice(saree: Saree): number {
+    const d = itemDiscounts[saree.saree_code];
+    if (!d || !d.value) return saree.selling_price;
+    const num = Number(d.value);
+    if (!Number.isFinite(num) || num <= 0) return saree.selling_price;
+    const discountAmt = d.mode === "percent" ? (saree.selling_price * num) / 100 : num;
+    return Math.max(0, Math.round(saree.selling_price - discountAmt));
+  }
+
+  function setItemDiscountMode(code: string, mode: DiscountMode) {
+    setItemDiscounts((prev) => ({ ...prev, [code]: { mode, value: prev[code]?.value ?? "" } }));
+  }
+
+  function setItemDiscountValue(code: string, value: string) {
+    setItemDiscounts((prev) => ({ ...prev, [code]: { mode: prev[code]?.mode ?? "flat", value } }));
+  }
+
   const subtotal = selectedSarees.reduce((sum, s) => sum + s.selling_price, 0);
-  const totalAmount = Math.max(0, subtotal - discountAmount);
+  const totalAmount = selectedSarees.reduce((sum, s) => sum + itemFinalPrice(s), 0);
+  const totalDiscount = Math.max(0, subtotal - totalAmount);
   const amountPaid =
     paymentMode === "full" ? totalAmount : paymentMode === "credit" ? 0 : Number(partialAmount) || 0;
   const amountDue = Math.max(0, totalAmount - amountPaid);
@@ -205,8 +227,10 @@ export function NewBillForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           customer_id: customer.customer_id,
-          saree_codes: selectedCodes,
-          discount: discountAmount,
+          items: selectedSarees.map((s) => ({
+            saree_code: s.saree_code,
+            price_at_sale: itemFinalPrice(s),
+          })),
           amount_paid: amountPaid,
           date,
           payment_method: paymentMethod,
@@ -222,7 +246,7 @@ export function NewBillForm() {
       const billImageItems: BillImageItem[] = selectedSarees.map((s) => ({
         saree_code: s.saree_code,
         description: `${s.material} - ${s.design_type}`,
-        price: s.selling_price,
+        price: itemFinalPrice(s),
       }));
 
       setSuccessBill({
@@ -346,6 +370,11 @@ export function NewBillForm() {
       {selectedCodes.length > 0 && (
         <p className="text-right text-lg font-medium text-sage-dark">
           Subtotal: <span className="text-terracotta">₹{subtotal}</span>
+          {totalDiscount > 0 && (
+            <span className="ml-2 text-sm font-normal text-sage-dark/60">
+              → ₹{totalAmount} after discount
+            </span>
+          )}
         </p>
       )}
 
@@ -433,15 +462,6 @@ export function NewBillForm() {
               + New Customer
             </button>
           </div>
-        )}
-      </div>
-
-      <div>
-        <DiscountInput subtotal={subtotal} onChange={setDiscountAmount} />
-        {discountAmount > 0 && (
-          <p className="mt-1 text-right text-sm text-sage-dark/70">
-            New Total: <span className="font-medium text-sage-dark">₹{totalAmount}</span>
-          </p>
         )}
       </div>
 
@@ -570,13 +590,64 @@ export function NewBillForm() {
 
       {selectedCodes.length > 0 && (
         <div className="rounded-xl border border-gold/20 bg-white p-4 text-sm">
-          {selectedSarees.map((s) => (
-            <div key={s.saree_code} className="flex justify-between py-1">
-              <span className="text-sage-dark/60">{s.saree_code}</span>
-              <span className="font-medium">₹{s.selling_price}</span>
-            </div>
-          ))}
+          <p className="mb-2 text-xs text-sage-dark/50">
+            Per-saree discount (optional) -- leave blank for full price
+          </p>
+          {selectedSarees.map((s) => {
+            const d = itemDiscounts[s.saree_code];
+            const final = itemFinalPrice(s);
+            const discounted = final < s.selling_price;
+            return (
+              <div key={s.saree_code} className="border-b border-gold/10 py-2 last:border-b-0">
+                <div className="flex justify-between">
+                  <span className="text-sage-dark/60">{s.saree_code}</span>
+                  <span className={discounted ? "text-sage-dark/40 line-through" : "font-medium"}>
+                    ₹{s.selling_price}
+                  </span>
+                </div>
+                <div className="mt-1 flex items-center gap-2">
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    value={d?.value ?? ""}
+                    onChange={(e) => setItemDiscountValue(s.saree_code, e.target.value)}
+                    placeholder="Discount"
+                    className="w-24 rounded-lg border border-gold/30 bg-white px-2 py-1 text-xs text-sage-dark outline-none focus:border-sage"
+                  />
+                  <div className="flex overflow-hidden rounded-lg border border-gold/30 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setItemDiscountMode(s.saree_code, "flat")}
+                      className={`px-2 py-1 ${
+                        (d?.mode ?? "flat") === "flat" ? "bg-sage text-cream" : "bg-white text-sage-dark"
+                      }`}
+                    >
+                      ₹
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setItemDiscountMode(s.saree_code, "percent")}
+                      className={`px-2 py-1 ${
+                        d?.mode === "percent" ? "bg-sage text-cream" : "bg-white text-sage-dark"
+                      }`}
+                    >
+                      %
+                    </button>
+                  </div>
+                  {discounted && (
+                    <span className="ml-auto font-medium text-terracotta">₹{final}</span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
           <div className="my-2 border-t border-gold/15" />
+          {totalDiscount > 0 && (
+            <div className="flex justify-between py-1">
+              <span className="text-sage-dark/60">Discount</span>
+              <span className="font-medium text-terracotta">-₹{totalDiscount}</span>
+            </div>
+          )}
           <div className="flex justify-between py-1">
             <span className="text-sage-dark/60">Total</span>
             <span className="font-medium">₹{totalAmount}</span>

@@ -17,8 +17,11 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => null);
   const customerId = body?.customer_id;
-  const sareeCodesRaw = body?.saree_codes;
-  const discount = Number(body?.discount ?? 0);
+  const itemsRaw: Array<{ saree_code?: unknown; price_at_sale?: unknown }> = Array.isArray(
+    body?.items
+  )
+    ? body.items
+    : [];
   const amountPaid = Number(body?.amount_paid ?? 0);
   const date = typeof body?.date === "string" ? body.date : "";
   const paymentMethod = body?.payment_method;
@@ -29,10 +32,10 @@ export async function POST(request: Request) {
   if (
     typeof customerId !== "string" ||
     !customerId ||
-    !Array.isArray(sareeCodesRaw) ||
-    sareeCodesRaw.length === 0 ||
-    !sareeCodesRaw.every((c) => typeof c === "string") ||
-    !Number.isFinite(discount) ||
+    itemsRaw.length === 0 ||
+    !itemsRaw.every(
+      (i) => typeof i?.saree_code === "string" && Number.isFinite(Number(i?.price_at_sale))
+    ) ||
     !Number.isFinite(amountPaid) ||
     !date ||
     (paymentMethod !== "Cash" && paymentMethod !== "UPI") ||
@@ -46,8 +49,10 @@ export async function POST(request: Request) {
   try {
     const result = await createBill({
       customer_id: customerId,
-      saree_codes: sareeCodesRaw,
-      discount,
+      items: itemsRaw.map((i) => ({
+        saree_code: String(i.saree_code),
+        price_at_sale: Number(i.price_at_sale),
+      })),
       amount_paid: amountPaid,
       date,
       payment_method: paymentMethod,

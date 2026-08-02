@@ -175,8 +175,11 @@ export async function getHomeSummary(): Promise<HomeSummary> {
 
 export type CreateBillInput = {
   customer_id: string;
-  saree_codes: string[];
-  discount: number; // already resolved to a flat rupee amount by the caller
+  // Each saree can carry its own discounted price (e.g. 5% off one, 10% off
+  // another) -- price_at_sale is what it actually sells for on this bill.
+  // The bill's aggregate `discount` is derived as subtotal - sum(price_at_sale)
+  // rather than being entered as a single bill-wide number.
+  items: { saree_code: string; price_at_sale: number }[];
   amount_paid: number;
   date: string;
   payment_method: PaymentMethod;
@@ -197,22 +200,26 @@ export type CreateBillInput = {
 export async function createBill(
   input: CreateBillInput
 ): Promise<{ bill: Bill; billItems: BillItem[]; expenses: Expense[] }> {
-  if (input.saree_codes.length === 0) {
+  if (input.items.length === 0) {
     throw new Error("Select at least one saree");
   }
 
   const inventory = await listInventory();
   const sareeByCode = new Map(inventory.map((s) => [s.saree_code, s]));
 
-  const selected = input.saree_codes.map((code) => {
-    const saree = sareeByCode.get(code);
-    if (!saree) throw new Error(`Saree ${code} not found`);
-    if (saree.status !== "In Stock") throw new Error(`Saree ${code} is no longer In Stock`);
-    return saree;
+  const selected = input.items.map((item) => {
+    const saree = sareeByCode.get(item.saree_code);
+    if (!saree) throw new Error(`Saree ${item.saree_code} not found`);
+    if (saree.status !== "In Stock") throw new Error(`Saree ${item.saree_code} is no longer In Stock`);
+    // Clamp to a sane range so a stray client-side bug can't corrupt the
+    // record -- never negative, never more than the saree's own price.
+    const priceAtSale = Math.max(0, Math.min(item.price_at_sale, saree.selling_price));
+    return { saree, priceAtSale };
   });
 
-  const subtotal = selected.reduce((sum, s) => sum + s.selling_price, 0);
-  const totalAmount = Math.max(0, subtotal - input.discount);
+  const subtotal = selected.reduce((sum, s) => sum + s.saree.selling_price, 0);
+  const totalAmount = selected.reduce((sum, s) => sum + s.priceAtSale, 0);
+  const discount = Math.max(0, subtotal - totalAmount);
   const amountPaid = Math.min(Math.max(0, input.amount_paid), totalAmount);
   const amountDue = totalAmount - amountPaid;
   const paymentStatus: PaymentStatus =
@@ -225,7 +232,7 @@ export async function createBill(
     customer_id: input.customer_id,
     date: input.date,
     subtotal,
-    discount: input.discount,
+    discount,
     total_amount: totalAmount,
     amount_paid: amountPaid,
     amount_due: amountDue,
@@ -236,20 +243,20 @@ export async function createBill(
   await appendRow(SHEET.Bills, bill);
 
   const billItems: BillItem[] = [];
-  for (const saree of selected) {
+  for (const { saree, priceAtSale } of selected) {
     const billItemId = await getNextId(SHEET.BillItems, "bill_item_id", "BI-", 5);
     const item: BillItem = {
       bill_item_id: billItemId,
       bill_number: billNumber,
       saree_code: saree.saree_code,
-      price_at_sale: saree.selling_price,
+      price_at_sale: priceAtSale,
       item_status: "Sold",
     };
     await appendRow(SHEET.BillItems, item);
     billItems.push(item);
   }
 
-  for (const saree of selected) {
+  for (const { saree } of selected) {
     await updateRowByKey(SHEET.Inventory, "saree_code", saree.saree_code, {
       status: "Sold",
       date_sold: input.date,

@@ -1,5 +1,6 @@
 import type { Bill, Customer } from "@/lib/types";
 import { fullName } from "@/lib/customerName";
+import { BILL_LOGO_DATA_URI } from "@/lib/billLogoBase64";
 
 const SAGE = "#4F7C6C";
 const SAGE_DARK = "#33473F";
@@ -63,7 +64,7 @@ export function BillImageTemplate({ bill, customer, items }: Props) {
     >
       <div style={{ textAlign: "center", paddingBottom: 8, borderBottom: `2px solid ${GOLD}` }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo-full.png" alt="AdiSutra" width={220} height={220} style={{ margin: "0 auto" }} />
+        <img src={BILL_LOGO_DATA_URI} alt="AdiSutra" width={220} height={220} style={{ margin: "0 auto" }} />
       </div>
 
       <div style={{ padding: "16px 0", fontFamily: "Arial, sans-serif", fontSize: 14 }}>
