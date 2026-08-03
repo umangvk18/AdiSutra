@@ -116,6 +116,35 @@ export async function logPayment(billNumber: string, amount: number): Promise<Bi
   return { ...bill, amount_paid: amountPaid, amount_due: amountDue, payment_status: paymentStatus };
 }
 
+/**
+ * Corrects a bill's recorded payment to an exact amount -- unlike
+ * logPayment (which only ever adds to what's recorded, for a genuine new
+ * payment received), this directly sets amount_paid, for fixing a data-entry
+ * mistake (e.g. a bill marked Paid that was actually never collected).
+ */
+export async function correctBillPayment(billNumber: string, amountPaid: number): Promise<Bill> {
+  if (amountPaid < 0) {
+    throw new Error("Amount cannot be negative");
+  }
+  const bill = await getBillByNumber(billNumber);
+  if (!bill) {
+    throw new Error(`Bill ${billNumber} not found`);
+  }
+
+  const clampedPaid = Math.min(amountPaid, bill.total_amount);
+  const amountDue = Math.max(0, bill.total_amount - clampedPaid);
+  const paymentStatus: PaymentStatus =
+    amountDue <= 0 ? "Paid" : clampedPaid > 0 ? "Partial" : "Credit";
+
+  await updateRowByKey(SHEET.Bills, "bill_number", billNumber, {
+    amount_paid: clampedPaid,
+    amount_due: amountDue,
+    payment_status: paymentStatus,
+  });
+
+  return { ...bill, amount_paid: clampedPaid, amount_due: amountDue, payment_status: paymentStatus };
+}
+
 /** Section 9: customer total spend / current due, always computed live from Bills. */
 export async function getCustomerBillSummary(customerId: string): Promise<{
   customer: Customer | null;

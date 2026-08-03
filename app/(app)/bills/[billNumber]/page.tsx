@@ -17,6 +17,12 @@ export default function BillDetailPage() {
   const [loggingPayment, setLoggingPayment] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
 
+  const [showCorrectPayment, setShowCorrectPayment] = useState(false);
+  const [correctMode, setCorrectMode] = useState<"full" | "partial" | "credit">("credit");
+  const [correctPartialAmount, setCorrectPartialAmount] = useState("");
+  const [correctingPayment, setCorrectingPayment] = useState(false);
+  const [correctError, setCorrectError] = useState<string | null>(null);
+
   function loadDetail() {
     fetch(`/api/bills/${billNumber}`)
       .then(async (res) => (res.ok ? await res.json() : null))
@@ -64,6 +70,36 @@ export default function BillDetailPage() {
       setPaymentError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setLoggingPayment(false);
+    }
+  }
+
+  async function handleCorrectPayment() {
+    const amount =
+      correctMode === "full"
+        ? bill.total_amount
+        : correctMode === "credit"
+          ? 0
+          : Number(correctPartialAmount);
+
+    setCorrectingPayment(true);
+    setCorrectError(null);
+    try {
+      const res = await fetch(`/api/bills/${billNumber}/correct-payment`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount_paid: amount }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Failed to correct payment");
+      }
+      setShowCorrectPayment(false);
+      setCorrectPartialAmount("");
+      loadDetail();
+    } catch (err) {
+      setCorrectError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setCorrectingPayment(false);
     }
   }
 
@@ -148,6 +184,83 @@ export default function BillDetailPage() {
             </button>
           </div>
         )}
+
+        <div className="mt-4">
+          {!showCorrectPayment ? (
+            <button
+              type="button"
+              onClick={() => {
+                setCorrectMode(
+                  bill.payment_status === "Paid"
+                    ? "full"
+                    : bill.payment_status === "Credit"
+                      ? "credit"
+                      : "partial"
+                );
+                setCorrectPartialAmount(String(bill.amount_paid));
+                setShowCorrectPayment(true);
+              }}
+              className="text-sm text-sage-dark/60 underline"
+            >
+              Payment marked wrong? Correct it
+            </button>
+          ) : (
+            <div className="rounded-2xl border border-gold/20 bg-white p-4">
+              <h2 className="mb-1 text-sm font-medium text-sage-dark/80">Correct Payment Status</h2>
+              <p className="mb-2 text-xs text-sage-dark/50">
+                Currently: {bill.payment_status}, ₹{bill.amount_paid} paid of ₹{bill.total_amount}
+              </p>
+              <div className="flex gap-2">
+                {(["full", "partial", "credit"] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setCorrectMode(mode)}
+                    className={`flex-1 rounded-xl border-2 py-3 text-sm font-medium ${
+                      correctMode === mode
+                        ? "border-sage bg-sage text-cream"
+                        : "border-gold/30 bg-white text-sage-dark"
+                    }`}
+                  >
+                    {mode === "full" ? "Paid Full" : mode === "partial" ? "Partial" : "Full Credit"}
+                  </button>
+                ))}
+              </div>
+              {correctMode === "partial" && (
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  value={correctPartialAmount}
+                  onChange={(e) => setCorrectPartialAmount(e.target.value)}
+                  placeholder="Amount actually paid"
+                  className="mt-2 w-full rounded-xl border-2 border-gold/30 bg-white px-4 py-3 text-base text-sage-dark outline-none focus:border-sage"
+                />
+              )}
+              {correctError && <p className="mt-2 text-center text-terracotta">{correctError}</p>}
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  disabled={
+                    correctingPayment ||
+                    (correctMode === "partial" &&
+                      !(Number(correctPartialAmount) >= 0 && Number(correctPartialAmount) <= bill.total_amount))
+                  }
+                  onClick={handleCorrectPayment}
+                  className="flex-1 rounded-xl bg-sage py-3 font-medium text-cream disabled:opacity-50"
+                >
+                  {correctingPayment ? "Saving..." : "Save Correction"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowCorrectPayment(false)}
+                  className="rounded-xl border-2 border-gold/40 px-4 py-3 text-sage-dark"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
 
         <h2 className="mb-2 mt-4 text-sm font-medium text-sage-dark/80">Items</h2>
         <div className="flex flex-col gap-2">
