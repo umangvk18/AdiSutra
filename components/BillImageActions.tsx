@@ -51,7 +51,19 @@ export function BillImageActions({ bill, customer, items }: Props) {
   }
 
   function greeting() {
-    return `Hi ${customer.first_name}, thank you for your purchase! Bill attached below 🌸`;
+    return `Hi ${customer.first_name}, 🌸
+
+Thank you for choosing AdiSutra! We hope your saree brings you lots of joy and compliments. ❤️
+
+Your bill is attached below. 🧾
+
+If you have a minute, we'd love your support:
+
+📷 Follow us on Instagram: https://www.instagram.com/adi_sutra_/
+
+⭐ Leave us a Google Review: https://share.google/HXBx5sSTHWh50N25M
+
+We'd also love to see you in your AdiSutra saree—do tag us or send us a picture! ✨`;
   }
 
   async function handleShareSheet() {
